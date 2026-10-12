@@ -4,9 +4,7 @@
   "w": 320,
   "tab": "scan",
   "overflow": 0,
-  "axe": [
-   "aria-prohibited-attr(2): div[aria-label=\"62% of accounts long\"] | div[aria-label=\"54% of accounts long\"]"
-  ],
+  "axe": [],
   "errs": []
  },
  {
@@ -30,9 +28,7 @@
   "w": 390,
   "tab": "scan",
   "overflow": 0,
-  "axe": [
-   "aria-prohibited-attr(2): div[aria-label=\"62% of accounts long\"] | div[aria-label=\"54% of accounts long\"]"
-  ],
+  "axe": [],
   "errs": []
  },
  {
@@ -56,9 +52,7 @@
   "w": 768,
   "tab": "scan",
   "overflow": 0,
-  "axe": [
-   "aria-prohibited-attr(2): div[aria-label=\"62% of accounts long\"] | div[aria-label=\"54% of accounts long\"]"
-  ],
+  "axe": [],
   "errs": []
  },
  {
@@ -82,9 +76,7 @@
   "w": 1024,
   "tab": "scan",
   "overflow": 0,
-  "axe": [
-   "aria-prohibited-attr(2): div[aria-label=\"62% of accounts long\"] | div[aria-label=\"54% of accounts long\"]"
-  ],
+  "axe": [],
   "errs": []
  },
  {
@@ -108,22 +100,20 @@
   "w": 1440,
   "tab": "scan",
   "overflow": 0,
-  "axe": [
-   "aria-prohibited-attr(2): div[aria-label=\"62% of accounts long\"] | div[aria-label=\"54% of accounts long\"]"
-  ],
-  "errs": []
- },
- {
-  "theme": "dark",
-  "w": 1440,
-  "tab": "journal",
-  "overflow": 0,
   "axe": [],
   "errs": []
  },
  {
   "theme": "dark",
   "w": 1440,
+  "tab": "journal",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "dark",
+  "w": 1440,
   "tab": "settings",
   "overflow": 0,
   "axe": [],
@@ -134,9 +124,7 @@
   "w": 320,
   "tab": "scan",
   "overflow": 0,
-  "axe": [
-   "aria-prohibited-attr(2): div[aria-label=\"62% of accounts long\"] | div[aria-label=\"54% of accounts long\"]"
-  ],
+  "axe": [],
   "errs": []
  },
  {
@@ -160,9 +148,7 @@
   "w": 390,
   "tab": "scan",
   "overflow": 0,
-  "axe": [
-   "aria-prohibited-attr(2): div[aria-label=\"62% of accounts long\"] | div[aria-label=\"54% of accounts long\"]"
-  ],
+  "axe": [],
   "errs": []
  },
  {
@@ -186,9 +172,7 @@
   "w": 768,
   "tab": "scan",
   "overflow": 0,
-  "axe": [
-   "aria-prohibited-attr(2): div[aria-label=\"62% of accounts long\"] | div[aria-label=\"54% of accounts long\"]"
-  ],
+  "axe": [],
   "errs": []
  },
  {
@@ -212,9 +196,7 @@
   "w": 1024,
   "tab": "scan",
   "overflow": 0,
-  "axe": [
-   "aria-prohibited-attr(2): div[aria-label=\"62% of accounts long\"] | div[aria-label=\"54% of accounts long\"]"
-  ],
+  "axe": [],
   "errs": []
  },
  {
@@ -238,9 +220,7 @@
   "w": 1440,
   "tab": "scan",
   "overflow": 0,
-  "axe": [
-   "aria-prohibited-attr(2): div[aria-label=\"62% of accounts long\"] | div[aria-label=\"54% of accounts long\"]"
-  ],
+  "axe": [],
   "errs": []
  },
  {
