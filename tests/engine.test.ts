@@ -31,7 +31,7 @@ describe("scan", () => {
       s.zones.forEach((z, i) => {
         expect(z.rank).toBe(i + 1); expect(z.top).toBeGreaterThanOrEqual(z.bottom);
         if (dir === "long") { expect(z.stop).toBeLessThan(z.bottom); expect(z.t1).toBeGreaterThan(z.entry); } else { expect(z.stop).toBeGreaterThan(z.top); expect(z.t1).toBeLessThan(z.entry); }
-        expect(z.rr1).toBeGreaterThanOrEqual(DEFAULTS.minRR - 1e-9); expect(z.rr2).toBeGreaterThan(z.rr1);
+        expect(z.rr1).toBeGreaterThanOrEqual(DEFAULTS.minRR - 1e-9); expect(z.rr2).toBeGreaterThan(z.rr1); expect(z.costs.total).toBe(0);
       });
       const d = s.zones.map((z) => Math.abs(z.entry - s.price)); expect(d[0]).toBeLessThanOrEqual(d[1]); expect(d[1]).toBeLessThanOrEqual(d[2]);
     }
@@ -61,4 +61,17 @@ describe("v1.1 setup rule", () => {
     expect(DEFAULTS.useHtf).toBe(false);
   });
   it("bands", async () => { const { confidenceBand } = await import("../src/engine/scan"); expect([49, 50, 70, 71].map(confidenceBand)).toEqual(["Low", "Medium", "Medium", "High"]); });
+});
+describe("v1.5 costs", () => {
+  const c = mk(wave(300, 0.2));
+  it("min R:R default 3; costs widen the stop and are netted from R:R", () => {
+    expect(DEFAULTS.minRR).toBe(3);
+    const a = scan(c, "long", DEFAULTS); const b = scan(c, "long", sanitize({ slippagePct: 0.05 }), { costs: { spread: 0.2, feePct: 0.05 } });
+    const za = a.zones[1], zb = b.zones[1];
+    expect(zb.costs.total).toBeCloseTo(0.2 + zb.entry * 0.001 + zb.entry * 0.001);
+    expect(zb.stop).toBeCloseTo(zb.rawStop - zb.costs.total); expect(zb.stop).toBeLessThan(za.stop);
+    expect(zb.rr1).toBeGreaterThanOrEqual(3 - 1e-9);
+    expect(zb.rr1).toBeCloseTo((zb.t1 - zb.entry - zb.costs.total) / (zb.entry - zb.stop));
+  });
+  it("spread can be turned off", () => { const z = scan(c, "long", sanitize({ useSpread: false }), { costs: { spread: 5, feePct: 0 } }).zones[0]; expect(z.costs.spread).toBe(0); });
 });

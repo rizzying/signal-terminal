@@ -10,6 +10,14 @@
  {
   "theme": "dark",
   "w": 320,
+  "tab": "market",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "dark",
+  "w": 320,
   "tab": "watch",
   "overflow": 0,
   "axe": [],
@@ -43,6 +51,14 @@
   "theme": "dark",
   "w": 390,
   "tab": "scan",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "dark",
+  "w": 390,
+  "tab": "market",
   "overflow": 0,
   "axe": [],
   "errs": []
@@ -83,6 +99,14 @@
   "theme": "dark",
   "w": 768,
   "tab": "scan",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "dark",
+  "w": 768,
+  "tab": "market",
   "overflow": 0,
   "axe": [],
   "errs": []
@@ -123,6 +147,14 @@
   "theme": "dark",
   "w": 1024,
   "tab": "scan",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "dark",
+  "w": 1024,
+  "tab": "market",
   "overflow": 0,
   "axe": [],
   "errs": []
@@ -170,6 +202,14 @@
  {
   "theme": "dark",
   "w": 1440,
+  "tab": "market",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "dark",
+  "w": 1440,
   "tab": "watch",
   "overflow": 0,
   "axe": [],
@@ -210,6 +250,14 @@
  {
   "theme": "light",
   "w": 320,
+  "tab": "market",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "light",
+  "w": 320,
   "tab": "watch",
   "overflow": 0,
   "axe": [],
@@ -243,6 +291,14 @@
   "theme": "light",
   "w": 390,
   "tab": "scan",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "light",
+  "w": 390,
+  "tab": "market",
   "overflow": 0,
   "axe": [],
   "errs": []
@@ -283,6 +339,14 @@
   "theme": "light",
   "w": 768,
   "tab": "scan",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "light",
+  "w": 768,
+  "tab": "market",
   "overflow": 0,
   "axe": [],
   "errs": []
@@ -323,6 +387,14 @@
   "theme": "light",
   "w": 1024,
   "tab": "scan",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "light",
+  "w": 1024,
+  "tab": "market",
   "overflow": 0,
   "axe": [],
   "errs": []
@@ -363,6 +435,14 @@
   "theme": "light",
   "w": 1440,
   "tab": "scan",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "light",
+  "w": 1440,
+  "tab": "market",
   "overflow": 0,
   "axe": [],
   "errs": []

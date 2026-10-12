@@ -3,7 +3,7 @@
   --ink:#0a0a0a;--ink-2:color-mix(in srgb,#000 66%,#fff);--ink-3:color-mix(in srgb,#000 56%,#fff);
   --line:color-mix(in srgb,#000 11%,#fff);--line-soft:color-mix(in srgb,#000 6%,#fff);
   --accent:#ff6a1f;--accent-ink:#b03e00;--accent-tint:color-mix(in srgb,#ff6a1f 12%,transparent);
-  --pos:#12a150;--neg:#e5484d;--warn:#d98a00;--pos-ink:#0b7a3a;--neg-ink:#c22a2f;
+  --pos:#12a150;--neg:#e5484d;--warn:#d98a00;--pos-ink:#086a31;--neg-ink:#c22a2f;
   --pos-tint:color-mix(in srgb,var(--pos) 12%,transparent);--neg-tint:color-mix(in srgb,var(--neg) 12%,transparent);--warn-tint:color-mix(in srgb,#f5a524 16%,transparent);
   --r-chip:6px;--r-control:10px;--r-card:14px;--ring:0 0 0 1px var(--line);
   --sh-card:0 0 0 1px var(--line),0 1px 2px -1px #0000000f,0 2px 4px #0000000a;
@@ -116,3 +116,13 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .bars{list-style:none;padding:0;margin:0;display:grid;gap:6px}.bars li{display:grid;grid-template-columns:7rem 1fr auto;gap:8px;align-items:center;font-size:13px}
 .bar{height:6px;border-radius:3px;background:var(--field);box-shadow:var(--ring);overflow:hidden}.bar>div{height:100%;background:var(--accent)}
 @media (max-width:47.99rem){.nav button{padding:10px 10px;font-size:13px}}
+.costs{line-height:1.4}.cmp td .btn{padding:0 4px 0 0}
+@media (min-width:48rem){.nav{position:relative}}.more-btn{display:none}.more-menu{display:none}
+@media (max-width:47.99rem){
+  .nav{overflow:visible;max-width:none}.nav .is-more{display:none}.nav .lg{display:none}
+  .nav .more-btn{display:inline-block;border:0;background:none;padding:10px 12px;border-radius:999px;color:var(--ink-2);cursor:pointer}.nav .more-btn.on{background:var(--surface);color:var(--ink);box-shadow:var(--sh-card)}
+  .more-menu{display:grid;position:absolute;right:0;bottom:calc(100% + 8px);min-width:10rem;padding:4px;background:var(--surface);border-radius:var(--r-control);box-shadow:var(--sh-overlay);animation:rise 160ms var(--ease) both}
+  .more-menu button{border:0;background:none;text-align:left;padding:12px 14px;border-radius:6px;cursor:pointer;color:var(--ink)}.more-menu button.on{background:var(--field)}
+  .nav button{padding:10px 11px}
+}
+@media (max-width:23rem){.nav button,.nav .more-btn{padding:10px 9px;font-size:13px}}

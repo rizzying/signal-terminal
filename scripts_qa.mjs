@@ -9,11 +9,12 @@ for (const theme of ["dark", "light"]) for (const w of sizes) {
   await ctx.addInitScript((t) => { localStorage.setItem("sig.theme", t); localStorage.setItem("sig.wallets", JSON.stringify([{ ex: "hyperliquid", address: "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303", name: "HLP vault" }])); }, theme);
   const p = await ctx.newPage(); const errs = [];
   p.on("console", (m) => m.type() === "error" && errs.push(m.text())); p.on("pageerror", (e) => errs.push(e.message));
-  for (const tab of ["scan", "watch", "wallets", "journal", "settings"]) {
+  for (const tab of ["scan", "market", "watch", "wallets", "journal", "settings"]) {
     await p.goto(`${base}/#${tab}`); await p.waitForTimeout(tab === "scan" ? 3500 : 800);
     if (tab === "scan") { await p.getByRole("button", { name: "Scan long" }).click(); await p.waitForTimeout(2500); }
-    if (tab === "scan") { const fp = p.locator(".funding"); await p.waitForFunction(() => document.querySelector(".funding table, .funding p"), null, { timeout: 15000 }).catch(() => {}); await p.waitForTimeout(1500); await fp.screenshot({ path: `docs/qa/funding-${w}-${theme}.png` }); await p.waitForTimeout(1500); await p.locator(".positioning").screenshot({ path: `docs/qa/positioning-${w}-${theme}.png` }); }
-    if (tab === "scan") { await p.getByRole("button", { name: "Run replay" }).click(); await p.waitForTimeout(1500); await p.locator(".history").screenshot({ path: `docs/qa/history-${w}-${theme}.png` }); }
+    if (tab === "market") { await p.waitForFunction(() => document.querySelector(".funding table"), null, { timeout: 15000 }).catch(() => {}); await p.waitForTimeout(2500); await p.locator(".funding").screenshot({ path: `docs/qa/funding-${w}-${theme}.png` }); await p.locator(".positioning").screenshot({ path: `docs/qa/positioning-${w}-${theme}.png` }); }
+    if (w === 320 && tab === "settings") { await p.getByRole("button", { name: "More" }).click(); await p.waitForTimeout(300); await p.screenshot({ path: `docs/qa/nav-more-320-${theme}.png` }); await p.keyboard.press("Escape"); }
+    if (tab === "scan" && (w === 390 || w === 1440)) { await p.getByRole("tab", { name: "Bulk" }).click(); await p.waitForSelector(".cmp tbody tr:nth-child(2)", { timeout: 20000 }).catch(() => errs.push("QA: compare row 2 missing")); await p.waitForTimeout(800); await p.locator(".result").screenshot({ path: `docs/qa/zones-costs-${w}-${theme}.png` }); await p.locator(".cmp").screenshot({ path: `docs/qa/compare-${w}-${theme}.png` }); await p.getByRole("tab", { name: "Hyperliquid" }).click(); await p.waitForTimeout(2500); }
     if (tab === "watch") { await p.getByRole("button", { name: "Scan watchlist" }).click(); await p.waitForSelector(".rt tbody tr", { timeout: 30000 }).catch(() => {}); await p.waitForTimeout(500); }
     if (tab === "wallets") await p.waitForTimeout(3000);
     if (tab === "journal") { await p.evaluate(() => new Promise((res) => { const r = indexedDB.open("signal", 1); r.onsuccess = () => { const tx = r.result.transaction("trades", "readwrite"); const st = tx.objectStore("trades"); const pn = [120, -60, 80, -150, 200, 45, -30, 90];

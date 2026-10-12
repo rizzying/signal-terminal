@@ -67,3 +67,15 @@ export async function walletFills(ex: "hyperliquid" | "bulk", user: string, f?: 
   const r = await getJson("bulk", `${BULK}/account`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "fills", user, limit: 1000 }) }, f);
   return (r.data ?? []).map((x: any) => ({ time: x.timestamp > 1e14 ? Math.floor(x.timestamp / 1e6) : x.timestamp, symbol: x.symbol, side: (x.maker === user ? !x.isBuy : x.isBuy) ? "buy" : "sell", px: x.price, sz: Math.abs(x.amount) }));
 }
+
+/** Best bid/ask from the public order book (read-only). */
+export type Book = { bid: number; ask: number; spread: number; spreadPct: number };
+export async function topOfBook(ex: Exchange, symbol: string, f?: F): Promise<Book> {
+  let bid: number, ask: number;
+  if (ex === "hyperliquid") { const r = await hl({ type: "l2Book", coin: symbol }, f); bid = +r.levels[0][0].px; ask = +r.levels[1][0].px; }
+  else if (ex === "bulk") { const r = await getJson("bulk", `${BULK}/l2book?type=l2book&coin=${encodeURIComponent(symbol)}&nlevels=1`, undefined, f); bid = +r.levels[0][0].px; ask = +r.levels[1][0].px; }
+  else { const r = await getJson("binance", `${BN}/ticker/bookTicker?symbol=${symbol}`, undefined, f); bid = +r.bidPrice; ask = +r.askPrice; }
+  if (!(bid > 0 && ask >= bid)) throw new MarketError("Order book is empty.");
+  const spread = ask - bid; return { bid, ask, spread, spreadPct: spread / ((ask + bid) / 2) };
+}
+export const feeFor = (ex: Exchange, s: { feeHyperliquid: number; feeBulk: number; feeBinance: number }) => (ex === "hyperliquid" ? s.feeHyperliquid : ex === "bulk" ? s.feeBulk : s.feeBinance);

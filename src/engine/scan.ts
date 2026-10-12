@@ -7,7 +7,8 @@ export type Pivot = { i: number; price: number; kind: "high" | "low"; label?: "H
 export type Break = { i: number; dir: "bull" | "bear"; level: number; choch: boolean };
 export type Box = { top: number; bottom: number; i: number; kind: "OB" | "FVG" | "Breaker" | "Swing"; dir: "bull" | "bear"; retests?: number };
 export type Signal = { key: SignalKey; name: string; pass: boolean; weight: number; detail: string };
-export type Zone = { rank: 1 | 2 | 3; name: "Aggressive" | "Balanced" | "Deep"; top: number; bottom: number; entry: number; stop: number; t1: number; t2: number; rr1: number; rr2: number; source: string; ready: boolean; note?: string };
+export type Costs = { spread: number; fees: number; slip: number; total: number };
+export type Zone = { costs: Costs; rawStop: number; rank: 1 | 2 | 3; name: "Aggressive" | "Balanced" | "Deep"; top: number; bottom: number; entry: number; stop: number; t1: number; t2: number; rr1: number; rr2: number; source: string; ready: boolean; note?: string };
 export type Setup = { dir: Dir; confidence: number; band: "Low" | "Medium" | "High"; othersAgree: number; structureOk: boolean; reason: string; shown: boolean; signals: Signal[]; zones: Zone[]; htf?: { tf: string; agrees: boolean | null; detail: string }; price: number; atr: number };
 export type Analysis = { pivots: Pivot[]; breaks: Break[]; obs: Box[]; fvgs: Box[]; breakers: Box[]; rsi: number[]; emaF: number[]; emaS: number[]; atr: number; liq: { price: number; long: number; short: number }[] };
 
@@ -131,7 +132,13 @@ function liqNudge(stop: number, dir: Dir, an: Analysis, w: number): { stop: numb
   const ns = stop + (ext - stop) * w;
   return (dir === "long" ? ns < stop : ns > stop) ? { stop: ns, note: "Stop moved past an estimated liquidation cluster" } : { stop };
 }
-export function buildZones(c: Candle[], an: Analysis, dir: Dir, s: Settings): Zone[] {
+export type CostInput = { spread: number; feePct: number };
+/** Round-trip trading cost in price units: spread once + taker fee and slippage on entry and exit. */
+export function costsAt(entry: number, ci: CostInput | undefined, s: Settings): Costs {
+  const spread = ci && s.useSpread ? Math.max(0, ci.spread) : 0; const fees = entry * 2 * ((ci?.feePct ?? 0) / 100); const slip = entry * 2 * (s.slippagePct / 100);
+  return { spread, fees, slip, total: spread + fees + slip };
+}
+export function buildZones(c: Candle[], an: Analysis, dir: Dir, s: Settings, ci?: CostInput): Zone[] {
   const px = c.at(-1)!.c; const bull = dir === "long"; const d = bull ? "bull" : "bear"; const A = an.atr;
   let cands: Box[] = [...an.obs, ...an.fvgs, ...an.breakers].filter((z) => z.dir === d && (bull ? z.bottom < px : z.top > px));
   const swings = an.pivots.filter((p) => p.kind === (bull ? "low" : "high") && (bull ? p.price < px : p.price > px))
@@ -157,12 +164,16 @@ export function buildZones(c: Candle[], an: Analysis, dir: Dir, s: Settings): Zo
     const entry = (z.top + z.bottom) / 2;
     let stop = bull ? z.bottom - s.stopAtr * A : z.top + s.stopAtr * A;
     const nudge = liqNudge(stop, dir, an, s.heatmapWeight); stop = nudge.stop;
+    const costs = costsAt(entry, ci, s); const rawStop = stop;
+    stop = bull ? stop - costs.total : stop + costs.total; // widen the stop by round-trip costs
     const R = Math.abs(entry - stop) || A * 0.1;
-    const tgts = opp.filter((p) => (bull ? p > entry + s.minRR * R : p < entry - s.minRR * R)).sort((a, b) => (bull ? a - b : b - a));
-    const t1 = tgts[0] ?? (bull ? entry + Math.max(2, s.minRR) * R : entry - Math.max(2, s.minRR) * R);
-    const t2 = tgts.find((t) => Math.abs(t - entry) > Math.abs(t1 - entry) * 1.3) ?? (bull ? entry + Math.abs(t1 - entry) * 1.8 : entry - Math.abs(t1 - entry) * 1.8);
+    // net reward = price move minus costs; TP must clear minRR after costs
+    const need = s.minRR * R + costs.total;
+    const tgts = opp.filter((p) => (bull ? p > entry + need : p < entry - need)).sort((a, b) => (bull ? a - b : b - a));
+    const t1 = tgts[0] ?? (bull ? entry + need : entry - need);
+    const t2 = tgts.find((t) => Math.abs(t - entry) > Math.abs(t1 - entry) * 1.3) ?? (bull ? entry + Math.abs(t1 - entry) * 1.6 : entry - Math.abs(t1 - entry) * 1.6);
     const src = z.retests === -1 ? "ATR step (no structure)" : z.kind === "Swing" ? `Swing ${bull ? "low" : "high"}` : `${d === "bull" ? "Bullish" : "Bearish"} ${z.kind}`;
-    return { rank: (k + 1) as 1 | 2 | 3, name: names[k], top: z.top, bottom: z.bottom, entry, stop, t1, t2, rr1: Math.abs(t1 - entry) / R, rr2: Math.abs(t2 - entry) / R, source: src, ready: px <= z.top + 1e-9 && px >= z.bottom - 1e-9, note: nudge.note };
+    return { costs, rawStop, rank: (k + 1) as 1 | 2 | 3, name: names[k], top: z.top, bottom: z.bottom, entry, stop, t1, t2, rr1: (Math.abs(t1 - entry) - costs.total) / R, rr2: (Math.abs(t2 - entry) - costs.total) / R, source: src, ready: px <= z.top + 1e-9 && px >= z.bottom - 1e-9, note: nudge.note };
   });
 }
 export function htfAgree(htf: Candle[] | null, dir: Dir, s: Settings, tf: string): Setup["htf"] {
@@ -172,7 +183,7 @@ export function htfAgree(htf: Candle[] | null, dir: Dir, s: Settings, tf: string
   const ok = b.dir === (dir === "long" ? "bull" : "bear");
   return { tf, agrees: ok, detail: `${tf} last ${b.choch ? "ChoCH" : "BoS"} is ${b.dir === "bull" ? "up" : "down"}` };
 }
-export function scan(c: Candle[], dir: Dir, s: Settings, opts: { maxLev?: number; htf?: Candle[] | null; htfTf?: string } = {}): Setup {
+export function scan(c: Candle[], dir: Dir, s: Settings, opts: { maxLev?: number; htf?: Candle[] | null; htfTf?: string; costs?: CostInput } = {}): Setup {
   if (c.length < MIN_CANDLES) throw new Error(`This market only has ${c.length} candles on this timeframe; Signal needs at least ${MIN_CANDLES}. Try a lower timeframe.`);
   const an = analyze(c, s, opts.maxLev);
   const signals = signalsFor(c, an, dir, s); const conf = confidence(signals);
@@ -182,7 +193,7 @@ export function scan(c: Candle[], dir: Dir, s: Settings, opts: { maxLev?: number
   if (s.gateStructure && !structureOk) fails.push("structure (BoS/ChoCH) doesn't agree");
   if (othersAgree < minO) fails.push(`only ${othersAgree} of ${others.length} other signals agree (need ${minO})`);
   if (conf < s.threshold) fails.push(`confidence ${conf}% is under your ${s.threshold}% filter`);
-  return { dir, confidence: conf, band: confidenceBand(conf), othersAgree, structureOk, reason: fails.join("; "), shown: !fails.length, signals, zones: buildZones(c, an, dir, s), htf: s.useHtf && opts.htfTf ? htfAgree(opts.htf ?? null, dir, s, opts.htfTf) : undefined, price: c.at(-1)!.c, atr: an.atr };
+  return { dir, confidence: conf, band: confidenceBand(conf), othersAgree, structureOk, reason: fails.join("; "), shown: !fails.length, signals, zones: buildZones(c, an, dir, s, opts.costs), htf: s.useHtf && opts.htfTf ? htfAgree(opts.htf ?? null, dir, s, opts.htfTf) : undefined, price: c.at(-1)!.c, atr: an.atr };
 }
 export const confidenceBand = (c: number): "Low" | "Medium" | "High" => (c > 70 ? "High" : c >= 50 ? "Medium" : "Low");
 export const MIN_CANDLES = 30;
