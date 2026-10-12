@@ -9,10 +9,12 @@ for (const theme of ["dark", "light"]) for (const w of sizes) {
   await ctx.addInitScript((t) => localStorage.setItem("sig.theme", t), theme);
   const p = await ctx.newPage(); const errs = [];
   p.on("console", (m) => m.type() === "error" && errs.push(m.text())); p.on("pageerror", (e) => errs.push(e.message));
-  for (const tab of ["scan", "journal", "settings"]) {
+  for (const tab of ["scan", "watch", "journal", "settings"]) {
     await p.goto(`${base}/#${tab}`); await p.waitForTimeout(tab === "scan" ? 3500 : 800);
     if (tab === "scan") { await p.getByRole("button", { name: "Scan long" }).click(); await p.waitForTimeout(2500); }
     if (tab === "scan") { const fp = p.locator(".funding"); await p.waitForFunction(() => document.querySelector(".funding table, .funding p"), null, { timeout: 15000 }).catch(() => {}); await p.waitForTimeout(1500); await fp.screenshot({ path: `docs/qa/funding-${w}-${theme}.png` }); await p.waitForTimeout(1500); await p.locator(".positioning").screenshot({ path: `docs/qa/positioning-${w}-${theme}.png` }); }
+    if (tab === "scan") { await p.getByRole("button", { name: "Run replay" }).click(); await p.waitForTimeout(1500); await p.locator(".history").screenshot({ path: `docs/qa/history-${w}-${theme}.png` }); }
+    if (tab === "watch") { await p.getByRole("button", { name: "Scan watchlist" }).click(); await p.waitForSelector(".rt tbody tr", { timeout: 30000 }).catch(() => {}); await p.waitForTimeout(500); }
     if (tab === "journal" && w === 390) { await p.getByRole("button", { name: "New trade" }).click(); await p.waitForTimeout(300); }
     const overflow = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     await p.waitForTimeout(400); await p.addScriptTag({ content: axe });

@@ -7,6 +7,7 @@ import { db, type ChecklistItem } from "../journal/db";
 import { Chart } from "./Chart";
 import { FundingPanel } from "./Funding";
 import { PositioningPanel } from "./Positioning";
+import { HistoryPanel } from "./History";
 import { AlertsCard, addAlert } from "./Alerts";
 import { baseAsset } from "../api/funding";
 import { oiHistory, type OIPoint } from "../api/positioning";
@@ -72,6 +73,7 @@ export function ScanView({ settings, theme, onJournal }: { settings: Settings; t
         <button className="btn short" disabled={!analysis || !!busy} onClick={() => run("short")}>{busy === "short" ? "Scanning…" : "Scan short"}</button>
       </div>
       {setup && <Result setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks })} onAlert={() => { const z = setup.zones[zone]; addAlert({ exchange: ex, symbol: sym, kind: "zone", lo: z.bottom, hi: z.top, label: `${setup.dir} Zone ${z.rank} entry ${fmt(z.bottom)}–${fmt(z.top)}` }); }} threshold={settings.threshold} />}
+      {analysis && <HistoryPanel candles={data} settings={settings} label={`${market?.label ?? sym} · ${tf.toUpperCase()}`} />}
       <FundingPanel symbol={sym} />
       <PositioningPanel symbol={sym} oi={oi} />
       <AlertsCard />
