@@ -1,0 +1,111 @@
+import { useEffect, useMemo, useState } from "react";
+import { candles as loadCandles, listMarkets, TFS, type Exchange, type Market, type TF } from "../api/markets";
+import type { Candle } from "../engine/indicators";
+import { analyze, fmt, HTF, MIN_CANDLES, scan, type Dir, type Setup } from "../engine/scan";
+import type { Settings } from "../engine/settings";
+import { db, type ChecklistItem } from "../journal/db";
+import { Chart } from "./Chart";
+
+const EX: { id: Exchange; name: string }[] = [{ id: "hyperliquid", name: "Hyperliquid" }, { id: "bulk", name: "Bulk" }, { id: "binance", name: "Binance" }];
+const DEF_SYM: Record<Exchange, string> = { hyperliquid: "BTC", bulk: "BTC-USD", binance: "BTCUSDT" };
+export type Draft = { exchange: Exchange; symbol: string; tf: TF; setup: Setup; zone: number; checklist: Record<string, boolean> };
+
+export function ScanView({ settings, theme, onJournal }: { settings: Settings; theme: string; onJournal: (d: Draft) => void }) {
+  const [ex, setEx] = useState<Exchange>(() => (localStorage.getItem("sig.ex") as Exchange) || "hyperliquid");
+  const [sym, setSym] = useState<string>(() => localStorage.getItem("sig.sym") || DEF_SYM[ex]);
+  const [tf, setTf] = useState<TF>(() => (localStorage.getItem("sig.tf") as TF) || "4h");
+  const [markets, setMarkets] = useState<Market[]>([]); const [q, setQ] = useState(""); const [open, setOpen] = useState(false);
+  const [data, setData] = useState<Candle[]>([]); const [err, setErr] = useState<string | null>(null); const [loading, setLoading] = useState(false);
+  const [setup, setSetup] = useState<Setup | null>(null); const [zone, setZone] = useState(0); const [busy, setBusy] = useState<Dir | null>(null);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]); const [ticks, setTicks] = useState<Record<string, boolean>>({}); const [newRule, setNewRule] = useState("");
+  useEffect(() => { db.get<ChecklistItem[]>("checklist").then((c) => setChecklist(c ?? [])); }, []);
+  useEffect(() => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); }, [ex, sym, tf]);
+  useEffect(() => {
+    let live = true; setMarkets([]);
+    listMarkets(ex).then((m) => { if (!live) return; setMarkets(m); if (!m.some((x) => x.symbol === sym)) setSym(m.find((x) => x.symbol === DEF_SYM[ex])?.symbol ?? m[0]?.symbol ?? DEF_SYM[ex]); }).catch((e) => live && setErr(String(e.message ?? e)));
+    return () => { live = false; };
+  }, [ex]);
+  useEffect(() => {
+    let live = true; setLoading(true); setErr(null); setSetup(null);
+    loadCandles(ex, sym, tf, 400).then((c) => { if (live) setData(c); }).catch((e) => live && setErr(String(e.message ?? e))).finally(() => live && setLoading(false));
+    return () => { live = false; };
+  }, [ex, sym, tf]);
+  const market = markets.find((m) => m.symbol === sym);
+  const analysis = useMemo(() => (data.length >= MIN_CANDLES ? analyze(data, settings, market?.maxLev) : null), [data, settings, market]);
+  const filtered = useMemo(() => { const s = q.trim().toLowerCase(); return (s ? markets.filter((m) => m.label.toLowerCase().includes(s) || m.symbol.toLowerCase().includes(s)) : markets).slice(0, 60); }, [q, markets]);
+  async function run(dir: Dir) {
+    setBusy(dir); setErr(null);
+    try {
+      const h = HTF[tf]; const htf = settings.useHtf && h ? await loadCandles(ex, sym, h as TF, 200).catch(() => null) : null;
+      setSetup(scan(data, dir, settings, { maxLev: market?.maxLev, htf, htfTf: h })); setZone(0); setTicks({});
+    } catch (e: any) { setErr(e.message ?? String(e)); } finally { setBusy(null); }
+  }
+  const saveChecklist = (c: ChecklistItem[]) => { setChecklist(c); db.set("checklist", c); };
+  const last = data.at(-1);
+  return (
+    <section className="stack rise">
+      <div className="card controls">
+        <div className="seg" role="tablist" aria-label="Exchange">{EX.map((e) => <button key={e.id} role="tab" aria-selected={ex === e.id} className={ex === e.id ? "on" : ""} onClick={() => setEx(e.id)}>{e.name}</button>)}</div>
+        <div className="symbox">
+          <label className="lbl" htmlFor="sym">Symbol</label>
+          <input id="sym" className="input" autoComplete="off" placeholder={market?.label ?? sym} value={open ? q : market?.label ?? sym} onFocus={() => { setOpen(true); setQ(""); }} onBlur={() => setTimeout(() => setOpen(false), 150)} onChange={(e) => setQ(e.target.value)} />
+          {open && <ul className="menu" role="listbox">{filtered.map((m) => <li key={m.symbol}><button role="option" aria-selected={m.symbol === sym} onMouseDown={(e) => e.preventDefault()} onClick={() => { setSym(m.symbol); setOpen(false); }}>{m.label}<span className="mono dim">{m.maxLev}x</span></button></li>)}{!filtered.length && <li className="dim pad">{markets.length ? "No match" : "Loading markets…"}</li>}</ul>}
+          <span className="mono dim small">{markets.length} markets</span>
+        </div>
+        <div className="seg" role="tablist" aria-label="Timeframe">{TFS.map((t) => <button key={t} role="tab" aria-selected={tf === t} className={tf === t ? "on" : ""} onClick={() => setTf(t)}>{t.toUpperCase()}</button>)}</div>
+      </div>
+      <div className="card chartcard">
+        <div className="cardhead"><span className="lbl">{market?.label ?? sym} · {tf.toUpperCase()} · {EX.find((e) => e.id === ex)!.name}</span><span className="mono">{last ? fmt(last.c) : loading ? "Loading…" : "–"}</span></div>
+        {err && <p className="alert" role="alert">{err}</p>}
+        {!loading && !err && data.length > 0 && data.length < MIN_CANDLES && <p className="alert" role="status">Only {data.length} candles on {tf.toUpperCase()} for this market (needs {MIN_CANDLES} to scan). Try a lower timeframe.</p>}
+        <Chart candles={data} analysis={analysis} setup={setup} zone={zone} theme={theme} viewKey={`${ex}|${sym}|${tf}`} />
+      </div>
+      <div className="scanrow">
+        <button className="btn long" disabled={!analysis || !!busy} onClick={() => run("long")}>{busy === "long" ? "Scanning…" : "Scan long"}</button>
+        <button className="btn short" disabled={!analysis || !!busy} onClick={() => run("short")}>{busy === "short" ? "Scanning…" : "Scan short"}</button>
+      </div>
+      {setup && <Result setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks })} threshold={settings.threshold} />}
+      <div className="card">
+        <div className="cardhead"><h2>My checklist</h2><span className="lbl">device-only</span></div>
+        {setup ? <p className="dim small">Tick the rules that hold for this {setup.dir} setup. Compare against Signal's checks above.</p> : <p className="dim small">Your own rules. Run a scan to tick them next to Signal's checks.</p>}
+        <ul className="checklist">{checklist.map((c) => <li key={c.id}><label><input type="checkbox" disabled={!setup} checked={!!ticks[c.text]} onChange={(e) => setTicks({ ...ticks, [c.text]: e.target.checked })} />{c.text}</label><button className="btn ghost sm" aria-label={`Remove rule ${c.text}`} onClick={() => saveChecklist(checklist.filter((x) => x.id !== c.id))}>Remove</button></li>)}</ul>
+        {setup && checklist.length > 0 && <p className="mono small">You: {Object.values(ticks).filter(Boolean).length}/{checklist.length} · Signal: {setup.signals.filter((s) => s.pass).length}/{setup.signals.length}</p>}
+        <form className="row" onSubmit={(e) => { e.preventDefault(); const t = newRule.trim(); if (t) { saveChecklist([...checklist, { id: Math.random().toString(36).slice(2), text: t }]); setNewRule(""); } }}>
+          <input className="input grow" aria-label="New rule" placeholder="e.g. 4H trend agrees" value={newRule} onChange={(e) => setNewRule(e.target.value)} /><button className="btn">Add rule</button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+function Result({ setup, zone, setZone, onJournal, threshold }: { setup: Setup; zone: number; setZone: (n: number) => void; onJournal: () => void; threshold: number }) {
+  const s = setup;
+  return (
+    <div className={`card result ${s.dir} rise`}>
+      <div className="cardhead">
+        <div className="row gap"><span className={`badge ${s.dir}`}>{s.dir.toUpperCase()}</span><span className="hero mono">P{s.confidence}</span>
+          <span className="info" tabIndex={0} title="Confidence = share of signals that agree with this direction. It is NOT the probability the trade wins: our backtest found agreement wasn't predictive.">ⓘ agreement, not win chance</span></div>
+        {s.htf && <span className={`badge ${s.htf.agrees == null ? "" : s.htf.agrees ? "long" : "short"}`} title={s.htf.detail}>{s.htf.tf.toUpperCase()} {s.htf.agrees == null ? "n/a" : s.htf.agrees ? "agrees" : "disagrees"}</span>}
+      </div>
+      <div className="meter" aria-hidden><div style={{ width: `${s.confidence}%` }} /><i style={{ left: `${threshold}%` }} /></div>
+      {!s.shown && <p className="alert">Below your P{threshold} threshold: no setup recommended. Zones are shown for reference only.</p>}
+      <ul className="signals">{s.signals.map((g) => <li key={g.key} className={g.pass ? "pass" : "fail"}><span aria-label={g.pass ? "passed" : "failed"}>{g.pass ? "✓" : "✕"}</span><b>{g.name}</b><span className="dim">{g.detail}</span></li>)}</ul>
+      <div className="zones" role="tablist" aria-label="Entry zones">
+        {s.zones.map((z, i) => (
+          <button key={i} role="tab" aria-selected={zone === i} className={`zone ${zone === i ? "on" : ""}`} onClick={() => setZone(i)}>
+            <div className="row between"><span className="lbl">Zone {z.rank} · {z.name}</span>{z.ready ? <span className="badge long">In zone</span> : <span className="badge">Wait</span>}</div>
+            <div className="kv">
+              <span>Entry</span><b>{fmt(z.bottom)} – {fmt(z.top)}</b>
+              <span>Stop</span><b className="neg">{fmt(z.stop)}</b>
+              <span>T1 / T2</span><b className="pos">{fmt(z.t1)} / {fmt(z.t2)}</b>
+              <span>R:R</span><b>{z.rr1.toFixed(1)}R / {z.rr2.toFixed(1)}R</b>
+            </div>
+            <span className="dim small">{z.source}{z.note ? ` · ${z.note}` : ""}</span>
+          </button>
+        ))}
+      </div>
+      <p className="dim small">Heatmap levels (dotted, “est. liq”) are a model estimate from volume and assumed leverage, not real positions.</p>
+      <button className="btn primary" onClick={onJournal}>Journal Zone {zone + 1}</button>
+    </div>
+  );
+}
