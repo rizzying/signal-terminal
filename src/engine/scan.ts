@@ -9,7 +9,7 @@ export type Box = { top: number; bottom: number; i: number; kind: "OB" | "FVG" |
 export type Signal = { key: SignalKey; name: string; pass: boolean; weight: number; detail: string };
 export type Costs = { spread: number; fees: number; slip: number; total: number };
 export type Zone = { costs: Costs; rawStop: number; rank: 1 | 2 | 3; name: "Aggressive" | "Balanced" | "Deep"; top: number; bottom: number; entry: number; stop: number; t1: number; t2: number; rr1: number; rr2: number; source: string; ready: boolean; note?: string };
-export type Setup = { dir: Dir; confidence: number; band: "Low" | "Medium" | "High"; othersAgree: number; structureOk: boolean; reason: string; shown: boolean; signals: Signal[]; zones: Zone[]; htf?: { tf: string; agrees: boolean | null; detail: string }; price: number; atr: number };
+export type Setup = { dir: Dir; confidence: number; band: "Low" | "Medium" | "High"; othersAgree: number; othersTotal: number; structureOk: boolean; reason: string; shown: boolean; signals: Signal[]; zones: Zone[]; htf?: { tf: string; agrees: boolean | null; detail: string }; price: number; atr: number };
 export type Analysis = { pivots: Pivot[]; breaks: Break[]; obs: Box[]; fvgs: Box[]; breakers: Box[]; rsi: number[]; emaF: number[]; emaS: number[]; atr: number; liq: { price: number; long: number; short: number }[] };
 
 export function pivots(c: Candle[], n = 3): Pivot[] {
@@ -117,7 +117,23 @@ export function signalsFor(c: Candle[], an: Analysis, dir: Dir, s: Settings): Si
   const rsiS = sig("rsi", rOk, `RSI ${r.toFixed(1)}${div ? `, ${bull ? "bullish" : "bearish"} divergence` : ""}`);
   const ef = an.emaF.at(-1)!, es = an.emaS.at(-1)!;
   const emaS = Number.isFinite(es) ? sig("ema", bull ? ef > es : ef < es, `EMA${s.emaFast} ${ef > es ? ">" : "<"} EMA${s.emaSlow}`) : { ...sig("ema", false, `Not enough history for EMA${s.emaSlow} (skipped)`), weight: 0 };
-  return [structure, fvgob, swings, breaker, inducement, rsiS, emaS];
+  return [structure, fvgob, swings, breaker, inducement, rsiS, emaS, breakoutSignal(c, an, dir, s)];
+}
+/** Breakout with volume: a close through the last confirmed swing high (low for shorts) within the last N bars, on ≥ X× average volume. */
+export function breakoutSignal(c: Candle[], an: Pick<Analysis, "pivots">, dir: Dir, s: Settings): Signal {
+  const name = SIGNAL_NAMES.breakout; const w = s.weights.breakout ?? 1; const bull = dir === "long";
+  if (!s.useBreakout) return { key: "breakout", name, pass: false, weight: 0, detail: "Off in Settings" };
+  const vols = c.slice(-(s.boAvgLen + s.boLookback)).map((k) => k.v);
+  if (!vols.some((v) => v > 0) || vols.some((v) => !Number.isFinite(v))) return { key: "breakout", name, pass: false, weight: 0, detail: "Skipped: this exchange gives no volume for this market" };
+  let best: string | null = null; let near: string | null = null;
+  for (let i = c.length - 1; i >= Math.max(1, c.length - s.boLookback); i--) {
+    const lvlP = [...an.pivots].reverse().find((p) => p.kind === (bull ? "high" : "low") && p.i + s.swingLen < i); if (!lvlP) continue;
+    const lvl = lvlP.price; const crossed = bull ? c[i].c > lvl && c[i - 1].c <= lvl : c[i].c < lvl && c[i - 1].c >= lvl; if (!crossed) continue;
+    const win = c.slice(Math.max(0, i - s.boAvgLen), i).map((k) => k.v); const avg = win.reduce((a, b) => a + b, 0) / (win.length || 1);
+    const x = avg > 0 ? c[i].v / avg : 0; const txt = `Closed ${bull ? "above" : "below"} ${fmt(lvl)} on ${x.toFixed(1)}× avg volume`;
+    if (x >= s.boMult) { best = txt; break; } near ??= `${txt} (needs ${s.boMult}×)`;
+  }
+  return { key: "breakout", name, pass: !!best, weight: w, detail: best ?? near ?? `No close ${bull ? "above the last swing high" : "below the last swing low"} in the last ${s.boLookback} bars` };
 }
 export const confidence = (sigs: Signal[]) => { const t = sigs.reduce((a, x) => a + x.weight, 0); return t ? Math.round((100 * sigs.reduce((a, x) => a + (x.pass ? x.weight : 0), 0)) / t) : 0; };
 
@@ -193,7 +209,7 @@ export function scan(c: Candle[], dir: Dir, s: Settings, opts: { maxLev?: number
   if (s.gateStructure && !structureOk) fails.push("structure (BoS/ChoCH) doesn't agree");
   if (othersAgree < minO) fails.push(`only ${othersAgree} of ${others.length} other signals agree (need ${minO})`);
   if (conf < s.threshold) fails.push(`confidence ${conf}% is under your ${s.threshold}% filter`);
-  return { dir, confidence: conf, band: confidenceBand(conf), othersAgree, structureOk, reason: fails.join("; "), shown: !fails.length, signals, zones: buildZones(c, an, dir, s, opts.costs), htf: s.useHtf && opts.htfTf ? htfAgree(opts.htf ?? null, dir, s, opts.htfTf) : undefined, price: c.at(-1)!.c, atr: an.atr };
+  return { dir, confidence: conf, band: confidenceBand(conf), othersAgree, othersTotal: others.length, structureOk, reason: fails.join("; "), shown: !fails.length, signals, zones: buildZones(c, an, dir, s, opts.costs), htf: s.useHtf && opts.htfTf ? htfAgree(opts.htf ?? null, dir, s, opts.htfTf) : undefined, price: c.at(-1)!.c, atr: an.atr };
 }
 export const confidenceBand = (c: number): "Low" | "Medium" | "High" => (c > 70 ? "High" : c >= 50 ? "Medium" : "Low");
 export const MIN_CANDLES = 30;

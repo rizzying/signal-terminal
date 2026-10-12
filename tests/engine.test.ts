@@ -75,3 +75,17 @@ describe("v1.5 costs", () => {
   });
   it("spread can be turned off", () => { const z = scan(c, "long", sanitize({ useSpread: false }), { costs: { spread: 5, feePct: 0 } }).zones[0]; expect(z.costs.spread).toBe(0); });
 });
+describe("breakout with volume", () => {
+  const base = (n: number, vol = 10): Candle[] => Array.from({ length: n }, (_, i) => { const c = 100 + 3 * Math.sin(i / 3); return { t: i, o: c, h: c + 0.5, l: c - 0.5, c, v: vol }; });
+  it("passes on a high-volume close above the last swing high, fails on low volume, skips with no volume", async () => {
+    const { breakoutSignal } = await import("../src/engine/scan");
+    const c = base(80); c.push({ t: 80, o: 102, h: 110, l: 101, c: 109, v: 40 });
+    const an = { pivots: pivots(c, 3) };
+    const p = breakoutSignal(c, an, "long", DEFAULTS); expect(p.pass).toBe(true); expect(p.detail).toMatch(/^Closed above .* on 4\.0× avg volume$/);
+    c[80].v = 12; const f = breakoutSignal(c, an, "long", DEFAULTS); expect(f.pass).toBe(false); expect(f.detail).toMatch(/needs 1.5×/);
+    expect(breakoutSignal(c, an, "short", DEFAULTS).pass).toBe(false);
+    const z = base(81, 0); const sk = breakoutSignal(z, { pivots: pivots(z, 3) }, "long", DEFAULTS); expect(sk.weight).toBe(0); expect(sk.detail).toMatch(/Skipped/);
+    expect(breakoutSignal(c, an, "long", sanitize({ useBreakout: false })).weight).toBe(0);
+  });
+  it("is one of 8 signals and counts toward the others", () => { const s = scan(mk(wave(300, 0.2)), "long", DEFAULTS); expect(s.signals).toHaveLength(8); expect(s.signals.at(-1)!.key).toBe("breakout"); });
+});

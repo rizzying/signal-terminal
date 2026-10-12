@@ -4,7 +4,7 @@ const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome", args
 const p = await b.newPage({ viewport: { width: 390, height: 844 } }); const errs = [];
 p.on("console", (m) => m.type() === "error" && errs.push(m.text())); p.on("pageerror", (e) => errs.push(e.message));
 await p.goto(url + "/#scan"); await p.waitForTimeout(6000);
-await p.getByRole("button", { name: "Scan long" }).click(); await p.waitForTimeout(3000);
-const out = await p.evaluate(() => ({ footer: document.querySelector(".foot")?.textContent, funding: document.querySelectorAll(".funding tbody tr").length, band: document.querySelector(".result .hero")?.textContent, extra: [...document.querySelectorAll("[data-smoke]")].map((e) => e.getAttribute("data-smoke") + ":" + e.textContent?.slice(0, 80)) }));
+await p.getByRole("button", { name: "Scan long" }).click(); await p.waitForTimeout(3000); await p.getByRole("tab", { name: "Bulk" }).click(); await p.waitForTimeout(6000);
+const out = await p.evaluate(() => ({ footer: document.querySelector(".foot")?.textContent, cmpRows: document.querySelectorAll(".cmp tbody tr").length, zone: document.querySelector(".zone.on .lbl")?.textContent, costs: document.querySelector(".zone.on .costs")?.textContent, breakout: [...document.querySelectorAll(".signals li")].find((l) => l.textContent.includes("Breakout"))?.textContent, tally: document.querySelector(".result .mono.dim")?.textContent, navMore: !!document.querySelector(".more-btn"), band: document.querySelector(".result .hero")?.textContent, extra: [...document.querySelectorAll("[data-smoke]")].map((e) => e.getAttribute("data-smoke") + ":" + e.textContent?.slice(0, 80)) }));
 await p.screenshot({ path: "docs/qa/live-smoke.png", fullPage: true });
 console.log(JSON.stringify({ ...out, errs }, null, 1)); await b.close();

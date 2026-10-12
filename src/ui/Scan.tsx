@@ -104,7 +104,7 @@ function Result({ book, ex, setup, zone, setZone, onJournal, onAlert, threshold 
   return (
     <div className={`card result ${s.dir} rise`}>
       <div className="cardhead">
-        <div className="row gap"><span className={`badge ${s.dir}`}>{s.dir.toUpperCase()}</span><span className="hero">{s.band}</span><span className="mono dim">{s.confidence}% · structure {s.structureOk ? "✓" : "✕"} + {s.othersAgree}/6</span>
+        <div className="row gap"><span className={`badge ${s.dir}`}>{s.dir.toUpperCase()}</span><span className="hero">{s.band}</span><span className="mono dim">{s.confidence}% · structure {s.structureOk ? "✓" : "✕"} + {s.othersAgree}/{s.othersTotal}</span>
           <span className="info" tabIndex={0} title="Share of signals on this timeframe that agree with this direction. Higher timeframes never change it. It is NOT the probability the trade wins: our backtests found agreement wasn't predictive.">ⓘ signals agreeing, not win chance</span></div>
       </div>
       {s.htf && <p className="dim small htfnote">HTF bias (context only, never scored or blocking): {s.htf.detail}{s.htf.agrees == null ? "" : s.htf.agrees ? " (same direction)" : " (opposite direction)"}.</p>}
