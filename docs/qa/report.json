@@ -18,6 +18,14 @@
  {
   "theme": "dark",
   "w": 320,
+  "tab": "wallets",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "dark",
+  "w": 320,
   "tab": "journal",
   "overflow": 0,
   "axe": [],
@@ -50,6 +58,14 @@
  {
   "theme": "dark",
   "w": 390,
+  "tab": "wallets",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "dark",
+  "w": 390,
   "tab": "journal",
   "overflow": 0,
   "axe": [],
@@ -82,6 +98,14 @@
  {
   "theme": "dark",
   "w": 768,
+  "tab": "wallets",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "dark",
+  "w": 768,
   "tab": "journal",
   "overflow": 0,
   "axe": [],
@@ -114,6 +138,14 @@
  {
   "theme": "dark",
   "w": 1024,
+  "tab": "wallets",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "dark",
+  "w": 1024,
   "tab": "journal",
   "overflow": 0,
   "axe": [],
@@ -139,6 +171,14 @@
   "theme": "dark",
   "w": 1440,
   "tab": "watch",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "dark",
+  "w": 1440,
+  "tab": "wallets",
   "overflow": 0,
   "axe": [],
   "errs": []
@@ -178,6 +218,14 @@
  {
   "theme": "light",
   "w": 320,
+  "tab": "wallets",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "light",
+  "w": 320,
   "tab": "journal",
   "overflow": 0,
   "axe": [],
@@ -210,6 +258,14 @@
  {
   "theme": "light",
   "w": 390,
+  "tab": "wallets",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "light",
+  "w": 390,
   "tab": "journal",
   "overflow": 0,
   "axe": [],
@@ -242,6 +298,14 @@
  {
   "theme": "light",
   "w": 768,
+  "tab": "wallets",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "light",
+  "w": 768,
   "tab": "journal",
   "overflow": 0,
   "axe": [],
@@ -274,6 +338,14 @@
  {
   "theme": "light",
   "w": 1024,
+  "tab": "wallets",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "light",
+  "w": 1024,
   "tab": "journal",
   "overflow": 0,
   "axe": [],
@@ -299,6 +371,14 @@
   "theme": "light",
   "w": 1440,
   "tab": "watch",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "light",
+  "w": 1440,
+  "tab": "wallets",
   "overflow": 0,
   "axe": [],
   "errs": []

@@ -4,6 +4,7 @@ import { fmt } from "../engine/scan";
 import { computePnl, computeR, db, EMOTIONS, exportJson, importJson, uid, type Trade } from "../journal/db";
 import { binanceCsvToTrades, fillsToTrades } from "../journal/imports";
 import { stats, type Row } from "../journal/stats";
+import { Dashboard } from "./Dashboard";
 
 const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
 export function JournalView({ prefill, clearPrefill }: { prefill: Trade | null; clearPrefill: () => void }) {
@@ -56,6 +57,7 @@ export function JournalView({ prefill, clearPrefill }: { prefill: Trade | null; 
             <td data-label=""><span className="row gap"><button className="btn ghost sm" onClick={() => setEdit(t)}>Edit</button><button className="btn ghost sm" onClick={async () => { if (confirm("Delete this trade from this device?")) { await db.del(t.id); reload(); } }}>Delete</button></span></td>
           </tr>)}</tbody></table> : <p className="dim">No trades yet. Scan a setup and tap “Journal”, add one manually, or import.</p>}
       </div>
+      <Dashboard trades={trades} />
       <div className="card"><div className="cardhead"><h2>Stats</h2><span className="lbl">closed trades</span></div>
         <div className="statgrid"><StatTable title="Overall" rows={st.overall} /><StatTable title="By signal" rows={st.bySignal} /><StatTable title="By confidence band" rows={st.byConfidence} /><StatTable title="By emotion" rows={st.byEmotion} /><StatTable title="Plan followed" rows={st.byPlan} /></div>
       </div>

@@ -6,15 +6,18 @@ const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome", args
 const sizes = [320, 390, 768, 1024, 1440]; const report = [];
 for (const theme of ["dark", "light"]) for (const w of sizes) {
   const ctx = await b.newContext({ viewport: { width: w, height: w < 768 ? 844 : 900 }, deviceScaleFactor: 1 });
-  await ctx.addInitScript((t) => localStorage.setItem("sig.theme", t), theme);
+  await ctx.addInitScript((t) => { localStorage.setItem("sig.theme", t); localStorage.setItem("sig.wallets", JSON.stringify([{ ex: "hyperliquid", address: "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303", name: "HLP vault" }])); }, theme);
   const p = await ctx.newPage(); const errs = [];
   p.on("console", (m) => m.type() === "error" && errs.push(m.text())); p.on("pageerror", (e) => errs.push(e.message));
-  for (const tab of ["scan", "watch", "journal", "settings"]) {
+  for (const tab of ["scan", "watch", "wallets", "journal", "settings"]) {
     await p.goto(`${base}/#${tab}`); await p.waitForTimeout(tab === "scan" ? 3500 : 800);
     if (tab === "scan") { await p.getByRole("button", { name: "Scan long" }).click(); await p.waitForTimeout(2500); }
     if (tab === "scan") { const fp = p.locator(".funding"); await p.waitForFunction(() => document.querySelector(".funding table, .funding p"), null, { timeout: 15000 }).catch(() => {}); await p.waitForTimeout(1500); await fp.screenshot({ path: `docs/qa/funding-${w}-${theme}.png` }); await p.waitForTimeout(1500); await p.locator(".positioning").screenshot({ path: `docs/qa/positioning-${w}-${theme}.png` }); }
     if (tab === "scan") { await p.getByRole("button", { name: "Run replay" }).click(); await p.waitForTimeout(1500); await p.locator(".history").screenshot({ path: `docs/qa/history-${w}-${theme}.png` }); }
     if (tab === "watch") { await p.getByRole("button", { name: "Scan watchlist" }).click(); await p.waitForSelector(".rt tbody tr", { timeout: 30000 }).catch(() => {}); await p.waitForTimeout(500); }
+    if (tab === "wallets") await p.waitForTimeout(3000);
+    if (tab === "journal") { await p.evaluate(() => new Promise((res) => { const r = indexedDB.open("signal", 1); r.onsuccess = () => { const tx = r.result.transaction("trades", "readwrite"); const st = tx.objectStore("trades"); const pn = [120, -60, 80, -150, 200, 45, -30, 90];
+      pn.forEach((v, i) => st.put({ id: "qa" + i, createdAt: Date.now() - (8 - i) * 86400000 - i * 3600000 * 5, exchange: "hyperliquid", symbol: "BTC", side: i % 2 ? "short" : "long", entry: 80000, exit: 80000 + v, stop: 79500, size: 1, pnl: v, r: v / 500, signals: ["Market structure (BoS / ChoCH)"], confidence: 40 + i * 6, zone: (i % 3) + 1, emotion: ["calm", "fomo"][i % 2], followedPlan: i % 3 !== 0, source: "scan" })); tx.oncomplete = res; }; })); await p.reload(); await p.waitForTimeout(1000); }
     if (tab === "journal" && w === 390) { await p.getByRole("button", { name: "New trade" }).click(); await p.waitForTimeout(300); }
     const overflow = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     await p.waitForTimeout(400); await p.addScriptTag({ content: axe });

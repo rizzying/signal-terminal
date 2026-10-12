@@ -112,3 +112,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 @media (max-width:47.99rem){.liqs li{grid-template-columns:3rem 4rem 1fr 4.5rem}.liqs li>:nth-child(5){display:none}}
 @media (max-width:47.99rem){.nav{max-width:calc(100vw - 16px);overflow-x:auto;scrollbar-width:none}.nav button{padding:10px 12px;white-space:nowrap}}
 @media (max-width:23rem){.nav button{padding:10px 9px;font-size:13px}}
+.curve{width:100%;height:160px;display:block}.curve path{fill:none;stroke-width:1.5}.curve path.up{stroke:var(--pos)}.curve path.down{stroke:var(--neg)}.curve .zero{stroke:var(--line);stroke-dasharray:3 3}
+.bars{list-style:none;padding:0;margin:0;display:grid;gap:6px}.bars li{display:grid;grid-template-columns:7rem 1fr auto;gap:8px;align-items:center;font-size:13px}
+.bar{height:6px;border-radius:3px;background:var(--field);box-shadow:var(--ring);overflow:hidden}.bar>div{height:100%;background:var(--accent)}
+@media (max-width:47.99rem){.nav button{padding:10px 10px;font-size:13px}}

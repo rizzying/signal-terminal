@@ -6,9 +6,10 @@ import { ScanView, type Draft } from "./ui/Scan";
 import { SettingsView } from "./ui/SettingsView";
 import { useAlertWatcher } from "./ui/Alerts";
 import { Watchlist } from "./ui/Watchlist";
+import { Wallets } from "./ui/Wallets";
 
-type Tab = "scan" | "watch" | "journal" | "settings";
-const TABS: { id: Tab; name: string }[] = [{ id: "scan", name: "Scan" }, { id: "watch", name: "Watchlist" }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings" }];
+type Tab = "scan" | "watch" | "wallets" | "journal" | "settings";
+const TABS: { id: Tab; name: string }[] = [{ id: "scan", name: "Scan" }, { id: "watch", name: "Watchlist" }, { id: "wallets", name: "Wallets" }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings" }];
 export default function App() {
   useAlertWatcher();
   const [tab, setTab] = useState<Tab>(() => (location.hash.slice(1) as Tab) || "scan");
@@ -35,10 +36,11 @@ export default function App() {
       <main>
         {tab === "scan" && <ScanView settings={settings} theme={theme} onJournal={journal} />}
         {tab === "watch" && <Watchlist settings={settings} onOpen={(ex, sym, tf) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); setTab("scan"); }} />}
+        {tab === "wallets" && <Wallets />}
         {tab === "journal" && <JournalView prefill={prefill} clearPrefill={() => setPrefill(null)} />}
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} />}
       </main>
-      <footer className="foot dim small">Signal v1.3 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v1.4 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }
