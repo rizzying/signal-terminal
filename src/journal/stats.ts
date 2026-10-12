@@ -8,7 +8,7 @@ function agg(groups: Map<string, Trade[]>): Row[] {
   }).filter((r) => r.n > 0).sort((a, b) => b.n - a.n);
 }
 const by = (ts: Trade[], f: (t: Trade) => string[]) => { const m = new Map<string, Trade[]>(); for (const t of ts) for (const k of f(t)) m.set(k, [...(m.get(k) ?? []), t]); return agg(m); };
-export const band = (c?: number) => (c == null ? "No score" : c >= 80 ? "P80–100" : c >= 65 ? "P65–79" : c >= 50 ? "P50–64" : "Below P50");
+export const band = (c?: number) => (c == null ? "No score" : c > 70 ? "High (>70%)" : c >= 50 ? "Medium (50–70%)" : "Low (<50%)");
 export function stats(ts: Trade[]) {
   return {
     overall: agg(new Map([["All trades", ts]])),

@@ -11,7 +11,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>(() => (location.hash.slice(1) as Tab) || "scan");
   const [theme, setTheme] = useState(() => localStorage.getItem("sig.theme") || "dark");
   const [settings, setSettingsS] = useState<Settings>(DEFAULTS); const [prefill, setPrefill] = useState<Trade | null>(null);
-  useEffect(() => { db.get<Settings>("settings").then((s) => s && setSettingsS(sanitize(s))); }, []);
+  useEffect(() => { db.get<Settings>("settings").then((s) => { if (!s) return; if ((s as any).gateStructure === undefined) s = { ...s, threshold: 0, useHtf: false }; setSettingsS(sanitize(s)); }); }, []);
   const setSettings = (s: Settings) => { setSettingsS(s); db.set("settings", s); };
   useEffect(() => { document.documentElement.classList.toggle("dark", theme === "dark"); document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#08080a" : "#ffffff"); localStorage.setItem("sig.theme", theme); }, [theme]);
   useEffect(() => { const f = () => { const h = location.hash.slice(1) as Tab; if (TABS.some((t) => t.id === h)) setTab(h); }; addEventListener("hashchange", f); return () => removeEventListener("hashchange", f); }, []);
@@ -34,7 +34,7 @@ export default function App() {
         {tab === "journal" && <JournalView prefill={prefill} clearPrefill={() => setPrefill(null)} />}
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} />}
       </main>
-      <footer className="foot dim small">Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v1.1 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }

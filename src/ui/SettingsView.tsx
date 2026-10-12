@@ -26,7 +26,8 @@ export function SettingsView({ settings, setSettings }: { settings: Settings; se
                 <button type="button" className="btn ghost sm" disabled={v === d} onClick={() => upd(p.key, d)} aria-label={`Reset ${p.label} to ${d}`}>↺ {d}</button></span></label>;
           })}
           {g === "Confidence" && <>
-            <label className="param"><span>Check higher timeframe</span><input type="checkbox" checked={settings.useHtf} onChange={(e) => upd("useHtf", e.target.checked)} /></label>
+            <label className="param"><span>Show higher-timeframe context note<small className="dim"> · never affects confidence</small></span><input type="checkbox" checked={settings.useHtf} onChange={(e) => upd("useHtf", e.target.checked)} /></label>
+            <label className="param"><span>Require structure (BoS/ChoCH) to agree<small className="dim"> · hard gate</small></span><input type="checkbox" checked={settings.gateStructure} onChange={(e) => upd("gateStructure", e.target.checked)} /></label>
             <label className="param"><span>Only unbroken order blocks</span><input type="checkbox" checked={settings.obMustBreak} onChange={(e) => upd("obMustBreak", e.target.checked)} /></label>
             {(Object.keys(SIGNAL_NAMES) as SignalKey[]).map((k) => <label key={k} className="param"><span>Weight: {SIGNAL_NAMES[k]}<small className="dim"> · 0 = off</small></span>
               <input className="input num" type="number" min={0} max={3} step={0.5} value={settings.weights[k]} onChange={(e) => setSettings(sanitize({ ...settings, weights: { ...settings.weights, [k]: Math.max(0, Math.min(3, +e.target.value || 0)) } }))} /></label>)}

@@ -12,6 +12,7 @@ for (const theme of ["dark", "light"]) for (const w of sizes) {
   for (const tab of ["scan", "journal", "settings"]) {
     await p.goto(`${base}/#${tab}`); await p.waitForTimeout(tab === "scan" ? 3500 : 800);
     if (tab === "scan") { await p.getByRole("button", { name: "Scan long" }).click(); await p.waitForTimeout(2500); }
+    if (tab === "scan") { const fp = p.locator(".funding"); await p.waitForFunction(() => document.querySelector(".funding table, .funding p"), null, { timeout: 15000 }).catch(() => {}); await p.waitForTimeout(1500); await fp.screenshot({ path: `docs/qa/funding-${w}-${theme}.png` }); }
     if (tab === "journal" && w === 390) { await p.getByRole("button", { name: "New trade" }).click(); await p.waitForTimeout(300); }
     const overflow = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     await p.waitForTimeout(400); await p.addScriptTag({ content: axe });

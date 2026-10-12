@@ -24,7 +24,7 @@ describe("journal", () => {
     const s = stats([{ id: "1", createdAt: 0, exchange: "", symbol: "X", side: "long", entry: 1, size: 1, pnl: 5, r: 1, signals: ["RSI", "FVG"], confidence: 70, emotion: "calm", followedPlan: true, source: "manual" },
       { id: "2", createdAt: 0, exchange: "", symbol: "X", side: "long", entry: 1, size: 1, pnl: -5, r: -1, signals: ["RSI"], confidence: 40, emotion: "fomo", followedPlan: false, source: "manual" }]);
     expect(s.bySignal.find((r) => r.key === "RSI")).toMatchObject({ n: 2, winRate: 0.5, avgR: 0 });
-    expect(s.byConfidence.map((r) => r.key).sort()).toEqual(["Below P50", "P65–79"]);
+    expect(s.byConfidence.map((r) => r.key).sort()).toEqual(["Low (<50%)", "Medium (50–70%)"]);
     expect(s.byPlan.find((r) => r.key === "followed plan")!.winRate).toBe(1);
   });
 });

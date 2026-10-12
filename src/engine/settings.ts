@@ -2,7 +2,7 @@ export type Settings = {
   swingLen: number; rsiLen: number; rsiOB: number; rsiOS: number; divLookback: number;
   emaFast: number; emaSlow: number; atrLen: number;
   fvgMinAtr: number; obMustBreak: boolean; obMaxAgeBars: number; breakerMaxRetests: number;
-  inducementLookback: number; threshold: number; heatmapWeight: number;
+  inducementLookback: number; threshold: number; gateStructure: boolean; minOthers: number; heatmapWeight: number;
   stopAtr: number; minRR: number; useHtf: boolean;
   weights: Record<SignalKey, number>;
 };
@@ -15,8 +15,8 @@ export const DEFAULTS: Settings = {
   swingLen: 3, rsiLen: 14, rsiOB: 70, rsiOS: 30, divLookback: 30,
   emaFast: 21, emaSlow: 50, atrLen: 14,
   fvgMinAtr: 0.1, obMustBreak: true, obMaxAgeBars: 120, breakerMaxRetests: 1,
-  inducementLookback: 20, threshold: 50, heatmapWeight: 0.5,
-  stopAtr: 0.25, minRR: 1.2, useHtf: true,
+  inducementLookback: 20, threshold: 0, gateStructure: true, minOthers: 3, heatmapWeight: 0.5,
+  stopAtr: 0.25, minRR: 1.2, useHtf: false,
   weights: { structure: 1, fvgob: 1, swings: 1, breaker: 1, inducement: 1, rsi: 1, ema: 1 },
 };
 type Meta = { key: keyof Settings; label: string; min: number; max: number; step: number; group: string; help?: string };
@@ -34,9 +34,10 @@ export const PARAMS: Meta[] = [
   { key: "emaSlow", label: "EMA slow", min: 3, max: 400, step: 1, group: "Momentum" },
   { key: "atrLen", label: "ATR length", min: 2, max: 50, step: 1, group: "Risk" },
   { key: "stopAtr", label: "Stop buffer (× ATR)", min: 0, max: 3, step: 0.05, group: "Risk" },
-  { key: "minRR", label: "Min R:R to target 1", min: 0.5, max: 5, step: 0.1, group: "Risk" },
+  { key: "minRR", label: "Min R:R to TP1", min: 0.5, max: 5, step: 0.1, group: "Risk" },
   { key: "heatmapWeight", label: "Heatmap weight", min: 0, max: 1, step: 0.05, group: "Risk", help: "0 = ignore the estimated liquidation map" },
-  { key: "threshold", label: "Show setup at ≥ P", min: 0, max: 100, step: 5, group: "Confidence" },
+  { key: "minOthers", label: "Min other signals agreeing", min: 0, max: 6, step: 1, group: "Confidence", help: "of the 6 non-structure signals (default 3)" },
+  { key: "threshold", label: "Extra filter: confidence ≥ %", min: 0, max: 100, step: 5, group: "Confidence", help: "0 = off" },
 ];
 export function sanitize(s: Partial<Settings>): Settings {
   const o: any = { ...DEFAULTS, ...s, weights: { ...DEFAULTS.weights, ...(s.weights ?? {}) } };

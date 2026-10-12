@@ -5,6 +5,7 @@ import { analyze, fmt, HTF, MIN_CANDLES, scan, type Dir, type Setup } from "../e
 import type { Settings } from "../engine/settings";
 import { db, type ChecklistItem } from "../journal/db";
 import { Chart } from "./Chart";
+import { FundingPanel } from "./Funding";
 
 const EX: { id: Exchange; name: string }[] = [{ id: "hyperliquid", name: "Hyperliquid" }, { id: "bulk", name: "Bulk" }, { id: "binance", name: "Binance" }];
 const DEF_SYM: Record<Exchange, string> = { hyperliquid: "BTC", bulk: "BTC-USD", binance: "BTCUSDT" };
@@ -64,6 +65,7 @@ export function ScanView({ settings, theme, onJournal }: { settings: Settings; t
         <button className="btn long" disabled={!analysis || !!busy} onClick={() => run("long")}>{busy === "long" ? "Scanning…" : "Scan long"}</button>
         <button className="btn short" disabled={!analysis || !!busy} onClick={() => run("short")}>{busy === "short" ? "Scanning…" : "Scan short"}</button>
       </div>
+      <FundingPanel symbol={sym} />
       {setup && <Result setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks })} threshold={settings.threshold} />}
       <div className="card">
         <div className="cardhead"><h2>My checklist</h2><span className="lbl">device-only</span></div>
@@ -83,12 +85,12 @@ function Result({ setup, zone, setZone, onJournal, threshold }: { setup: Setup; 
   return (
     <div className={`card result ${s.dir} rise`}>
       <div className="cardhead">
-        <div className="row gap"><span className={`badge ${s.dir}`}>{s.dir.toUpperCase()}</span><span className="hero mono">P{s.confidence}</span>
-          <span className="info" tabIndex={0} title="Confidence = share of signals that agree with this direction. It is NOT the probability the trade wins: our backtest found agreement wasn't predictive.">ⓘ agreement, not win chance</span></div>
-        {s.htf && <span className={`badge ${s.htf.agrees == null ? "" : s.htf.agrees ? "long" : "short"}`} title={s.htf.detail}>{s.htf.tf.toUpperCase()} {s.htf.agrees == null ? "n/a" : s.htf.agrees ? "agrees" : "disagrees"}</span>}
+        <div className="row gap"><span className={`badge ${s.dir}`}>{s.dir.toUpperCase()}</span><span className="hero">{s.band}</span><span className="mono dim">{s.confidence}% · structure {s.structureOk ? "✓" : "✕"} + {s.othersAgree}/6</span>
+          <span className="info" tabIndex={0} title="Share of signals on this timeframe that agree with this direction. Higher timeframes never change it. It is NOT the probability the trade wins: our backtests found agreement wasn't predictive.">ⓘ signals agreeing, not win chance</span></div>
       </div>
-      <div className="meter" aria-hidden><div style={{ width: `${s.confidence}%` }} /><i style={{ left: `${threshold}%` }} /></div>
-      {!s.shown && <p className="alert">Below your P{threshold} threshold: no setup recommended. Zones are shown for reference only.</p>}
+      {s.htf && <p className="dim small htfnote">HTF bias (context only, never scored or blocking): {s.htf.detail}{s.htf.agrees == null ? "" : s.htf.agrees ? " (same direction)" : " (opposite direction)"}.</p>}
+      <div className="meter" aria-hidden><div style={{ width: `${s.confidence}%` }} />{threshold > 0 && <i style={{ left: `${threshold}%` }} />}</div>
+      {s.shown ? <p className="dim small">Setup rule met. Zones below.</p> : <p className="alert">No setup: {s.reason}. Zones are shown for reference only.</p>}
       <ul className="signals">{s.signals.map((g) => <li key={g.key} className={g.pass ? "pass" : "fail"}><span aria-label={g.pass ? "passed" : "failed"}>{g.pass ? "✓" : "✕"}</span><b>{g.name}</b><span className="dim">{g.detail}</span></li>)}</ul>
       <div className="zones" role="tablist" aria-label="Entry zones">
         {s.zones.map((z, i) => (
@@ -96,8 +98,9 @@ function Result({ setup, zone, setZone, onJournal, threshold }: { setup: Setup; 
             <div className="row between"><span className="lbl">Zone {z.rank} · {z.name}</span>{z.ready ? <span className="badge long">In zone</span> : <span className="badge">Wait</span>}</div>
             <div className="kv">
               <span>Entry</span><b>{fmt(z.bottom)} – {fmt(z.top)}</b>
+              <span>Median</span><b>{fmt(z.entry)}</b>
               <span>Stop</span><b className="neg">{fmt(z.stop)}</b>
-              <span>T1 / T2</span><b className="pos">{fmt(z.t1)} / {fmt(z.t2)}</b>
+              <span>TP1 / TP2</span><b className="pos">{fmt(z.t1)} / {fmt(z.t2)}</b>
               <span>R:R</span><b>{z.rr1.toFixed(1)}R / {z.rr2.toFixed(1)}R</b>
             </div>
             <span className="dim small">{z.source}{z.note ? ` · ${z.note}` : ""}</span>

@@ -48,8 +48,8 @@ export function Chart({ candles, analysis, setup, zone, theme, viewKey }: { cand
     const z = setup?.zones[zone];
     if (z) {
       const acc = css("--accent");
-      add(z.top, acc, `Z${z.rank} top`, LineStyle.Dashed); add(z.bottom, acc, `Z${z.rank} bottom`, LineStyle.Dashed);
-      add(z.stop, css("--neg"), "Stop"); add(z.t1, css("--pos"), "T1"); add(z.t2, css("--pos"), "T2", LineStyle.Dotted);
+      add(z.top, acc, "Entry top", LineStyle.Dashed); add(z.entry, acc, "Entry median", LineStyle.Dotted); add(z.bottom, acc, "Entry bottom", LineStyle.Dashed);
+      add(z.stop, css("--neg"), "Stop"); add(z.t1, css("--pos"), "TP1"); add(z.t2, css("--pos"), "TP2", LineStyle.Dotted);
     }
     if (analysis?.liq.length && setup) {
       const side = analysis.liq.map((b) => ({ p: b.price, v: b.long + b.short })).sort((a, b) => b.v - a.v).slice(0, 3);

@@ -8,7 +8,7 @@ export type Break = { i: number; dir: "bull" | "bear"; level: number; choch: boo
 export type Box = { top: number; bottom: number; i: number; kind: "OB" | "FVG" | "Breaker" | "Swing"; dir: "bull" | "bear"; retests?: number };
 export type Signal = { key: SignalKey; name: string; pass: boolean; weight: number; detail: string };
 export type Zone = { rank: 1 | 2 | 3; name: "Aggressive" | "Balanced" | "Deep"; top: number; bottom: number; entry: number; stop: number; t1: number; t2: number; rr1: number; rr2: number; source: string; ready: boolean; note?: string };
-export type Setup = { dir: Dir; confidence: number; shown: boolean; signals: Signal[]; zones: Zone[]; htf?: { tf: string; agrees: boolean | null; detail: string }; price: number; atr: number };
+export type Setup = { dir: Dir; confidence: number; band: "Low" | "Medium" | "High"; othersAgree: number; structureOk: boolean; reason: string; shown: boolean; signals: Signal[]; zones: Zone[]; htf?: { tf: string; agrees: boolean | null; detail: string }; price: number; atr: number };
 export type Analysis = { pivots: Pivot[]; breaks: Break[]; obs: Box[]; fvgs: Box[]; breakers: Box[]; rsi: number[]; emaF: number[]; emaS: number[]; atr: number; liq: { price: number; long: number; short: number }[] };
 
 export function pivots(c: Candle[], n = 3): Pivot[] {
@@ -176,8 +176,15 @@ export function scan(c: Candle[], dir: Dir, s: Settings, opts: { maxLev?: number
   if (c.length < MIN_CANDLES) throw new Error(`This market only has ${c.length} candles on this timeframe; Signal needs at least ${MIN_CANDLES}. Try a lower timeframe.`);
   const an = analyze(c, s, opts.maxLev);
   const signals = signalsFor(c, an, dir, s); const conf = confidence(signals);
-  return { dir, confidence: conf, shown: conf >= s.threshold, signals, zones: buildZones(c, an, dir, s), htf: s.useHtf && opts.htfTf ? htfAgree(opts.htf ?? null, dir, s, opts.htfTf) : undefined, price: c.at(-1)!.c, atr: an.atr };
+  const structureOk = signals.find((x) => x.key === "structure")!.pass; const others = signals.filter((x) => x.key !== "structure" && x.weight > 0);
+  const othersAgree = others.filter((x) => x.pass).length; const minO = Math.min(s.minOthers, others.length);
+  const fails: string[] = [];
+  if (s.gateStructure && !structureOk) fails.push("structure (BoS/ChoCH) doesn't agree");
+  if (othersAgree < minO) fails.push(`only ${othersAgree} of ${others.length} other signals agree (need ${minO})`);
+  if (conf < s.threshold) fails.push(`confidence ${conf}% is under your ${s.threshold}% filter`);
+  return { dir, confidence: conf, band: confidenceBand(conf), othersAgree, structureOk, reason: fails.join("; "), shown: !fails.length, signals, zones: buildZones(c, an, dir, s), htf: s.useHtf && opts.htfTf ? htfAgree(opts.htf ?? null, dir, s, opts.htfTf) : undefined, price: c.at(-1)!.c, atr: an.atr };
 }
+export const confidenceBand = (c: number): "Low" | "Medium" | "High" => (c > 70 ? "High" : c >= 50 ? "Medium" : "Low");
 export const MIN_CANDLES = 30;
 export const HTF: Record<string, string | undefined> = { "15m": "4h", "4h": "1d", "1d": "1w", "1w": undefined };
 export function fmt(n: number) { if (!Number.isFinite(n)) return "–"; const a = Math.abs(n); const d = a >= 1000 ? 1 : a >= 10 ? 2 : a >= 1 ? 4 : 6; return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: d }); }

@@ -50,3 +50,15 @@ describe("scan", () => {
   it("rejects too little data", () => { expect(() => scan(mk(wave(20, 0)), "long", DEFAULTS)).toThrow(); const s = scan(mk(wave(40, 0.2)), "long", DEFAULTS); expect(s.signals.find((x) => x.key === "ema")!.weight).toBe(0); });
   it("heatmap weight 0 disables liq model", () => { expect(analyze(c, sanitize({ heatmapWeight: 0 })).liq).toEqual([]); expect(buildZones(c, analyze(c, DEFAULTS), "long", DEFAULTS)).toHaveLength(3); });
 });
+describe("v1.1 setup rule", () => {
+  const c = mk(wave(300, 0.2));
+  it("structure gate + min others decides shown; HTF never affects confidence or shown", () => {
+    const s = scan(c, "long", DEFAULTS);
+    expect(s.shown).toBe(s.structureOk && s.othersAgree >= 3);
+    const withHtf = scan(c, "long", sanitize({ useHtf: true }), { htf: mk(wave(200, -0.5)), htfTf: "1d" });
+    expect(withHtf.confidence).toBe(s.confidence); expect(withHtf.shown).toBe(s.shown); expect(withHtf.htf?.agrees).toBe(false);
+    expect(scan(c, "long", sanitize({ minOthers: 0, gateStructure: false })).shown).toBe(true);
+    expect(DEFAULTS.useHtf).toBe(false);
+  });
+  it("bands", async () => { const { confidenceBand } = await import("../src/engine/scan"); expect([49, 50, 70, 71].map(confidenceBand)).toEqual(["Low", "Medium", "Medium", "High"]); });
+});

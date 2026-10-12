@@ -97,3 +97,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 @media (max-width:23rem){.formgrid{grid-template-columns:1fr}.seg button{padding:6px 9px}}
 @media (pointer:coarse){.btn,.input,.seg button,.nav button{min-height:44px}.btn.sm{min-height:36px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+.arb{background:var(--accent-tint);border-radius:var(--r-control);box-shadow:inset 3px 0 0 var(--accent);padding:12px 14px;margin-bottom:16px}.arb p{margin:4px 0}
+.ftable tr.hl td{background:var(--field)}
+.htfnote{margin:0 0 12px}
+@media (max-width:47.99rem){.ftable tr.hl{box-shadow:0 0 0 1.5px var(--accent)}.ftable tr.hl td{background:none}}
+.arb>.lbl{color:var(--accent-ink)}
