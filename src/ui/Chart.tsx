@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { createChart, CrosshairMode, LineStyle, type IChartApi, type ISeriesApi, type IPriceLine, type SeriesMarker, type Time } from "lightweight-charts";
 import type { Candle } from "../engine/indicators";
 import type { Analysis, Setup } from "../engine/scan";
+import type { OIPoint } from "../api/positioning";
 
 let cv: CanvasRenderingContext2D | null = null;
 /** Resolve a CSS custom property (may be color-mix()) to an rgba() string the chart library can parse. */
@@ -13,13 +14,14 @@ const css = (v: string) => {
   cv.clearRect(0, 0, 1, 1); cv.fillStyle = "#888"; cv.fillStyle = resolved; cv.fillRect(0, 0, 1, 1);
   const [r, g, b, a] = cv.getImageData(0, 0, 1, 1).data; return `rgba(${r},${g},${b},${(a / 255).toFixed(3)})`;
 };
-export function Chart({ candles, analysis, setup, zone, theme, viewKey }: { candles: Candle[]; analysis: Analysis | null; setup: Setup | null; zone: number; theme: string; viewKey: string }) {
+export function Chart({ candles, analysis, setup, zone, theme, viewKey, oi }: { candles: Candle[]; analysis: Analysis | null; setup: Setup | null; zone: number; theme: string; viewKey: string; oi?: OIPoint[] | null }) {
+  const oiSeries = useRef<ISeriesApi<"Line"> | null>(null);
   const el = useRef<HTMLDivElement>(null); const chart = useRef<IChartApi | null>(null); const series = useRef<ISeriesApi<"Candlestick"> | null>(null); const lines = useRef<IPriceLine[]>([]);
   useEffect(() => {
     if (!el.current) return;
     const c = createChart(el.current, { autoSize: true, crosshair: { mode: CrosshairMode.Normal }, rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.1, bottom: 0.08 } }, timeScale: { borderVisible: false, timeVisible: true, rightOffset: 6 } });
     series.current = c.addCandlestickSeries({ borderVisible: false }); chart.current = c;
-    return () => { c.remove(); chart.current = null; series.current = null; lines.current = []; };
+    return () => { c.remove(); oiSeries.current = null; chart.current = null; series.current = null; lines.current = []; };
   }, []);
   useEffect(() => {
     const c = chart.current; if (!c) return; const ink2 = css("--ink-2"), line = css("--line-soft"), pos = css("--pos"), neg = css("--neg");
@@ -56,6 +58,14 @@ export function Chart({ candles, analysis, setup, zone, theme, viewKey }: { cand
       side.forEach((b) => add(b.p, css("--warn"), "est. liq", LineStyle.SparseDotted));
     }
   }, [analysis, setup, zone, theme, candles]);
+  useEffect(() => {
+    const c = chart.current; if (!c) return;
+    if (!oi?.length) { if (oiSeries.current) { c.removeSeries(oiSeries.current); oiSeries.current = null; } return; }
+    if (!oiSeries.current) { oiSeries.current = c.addLineSeries({ priceScaleId: "oi", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, title: "OI" }); c.priceScale("oi").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 }, visible: false }); }
+    oiSeries.current.applyOptions({ color: css("--accent") });
+    const t0 = candles[0]?.t ?? 0; const seen = new Set<number>();
+    oiSeries.current.setData(oi.filter((p) => p.t >= t0 && p.oiUsd > 0).map((p) => ({ time: (p.t / 1000) as Time, value: p.oiUsd })).filter((p) => !seen.has(p.time as number) && (seen.add(p.time as number), true)));
+  }, [oi, theme, candles]);
   const reset = () => { const c = chart.current; if (!c || !candles.length) return; c.timeScale().setVisibleLogicalRange({ from: candles.length - 120, to: candles.length + 6 }); series.current?.priceScale().applyOptions({ autoScale: true }); };
   return <div className="chartwrap"><div ref={el} className="chart" aria-label="Candlestick chart" /><button className="btn ghost sm chart-reset" onClick={reset}>Reset view</button></div>;
 }

@@ -6,6 +6,10 @@ import type { Settings } from "../engine/settings";
 import { db, type ChecklistItem } from "../journal/db";
 import { Chart } from "./Chart";
 import { FundingPanel } from "./Funding";
+import { PositioningPanel } from "./Positioning";
+import { AlertsCard, addAlert } from "./Alerts";
+import { baseAsset } from "../api/funding";
+import { oiHistory, type OIPoint } from "../api/positioning";
 
 const EX: { id: Exchange; name: string }[] = [{ id: "hyperliquid", name: "Hyperliquid" }, { id: "bulk", name: "Bulk" }, { id: "binance", name: "Binance" }];
 const DEF_SYM: Record<Exchange, string> = { hyperliquid: "BTC", bulk: "BTC-USD", binance: "BTCUSDT" };
@@ -31,6 +35,8 @@ export function ScanView({ settings, theme, onJournal }: { settings: Settings; t
     loadCandles(ex, sym, tf, 400).then((c) => { if (live) setData(c); }).catch((e) => live && setErr(String(e.message ?? e))).finally(() => live && setLoading(false));
     return () => { live = false; };
   }, [ex, sym, tf]);
+  const [showOi, setShowOi] = useState(() => localStorage.getItem("sig.oi") !== "0"); const [oi, setOi] = useState<OIPoint[] | null>(null);
+  useEffect(() => { localStorage.setItem("sig.oi", showOi ? "1" : "0"); if (!showOi) { setOi(null); return; } let live = true; oiHistory(baseAsset(sym), tf, 400).then((x) => live && setOi(x)).catch(() => live && setOi(null)); return () => { live = false; }; }, [sym, tf, showOi]);
   const market = markets.find((m) => m.symbol === sym);
   const analysis = useMemo(() => (data.length >= MIN_CANDLES ? analyze(data, settings, market?.maxLev) : null), [data, settings, market]);
   const filtered = useMemo(() => { const s = q.trim().toLowerCase(); return (s ? markets.filter((m) => m.label.toLowerCase().includes(s) || m.symbol.toLowerCase().includes(s)) : markets).slice(0, 60); }, [q, markets]);
@@ -56,17 +62,19 @@ export function ScanView({ settings, theme, onJournal }: { settings: Settings; t
         <div className="seg" role="tablist" aria-label="Timeframe">{TFS.map((t) => <button key={t} role="tab" aria-selected={tf === t} className={tf === t ? "on" : ""} onClick={() => setTf(t)}>{t.toUpperCase()}</button>)}</div>
       </div>
       <div className="card chartcard">
-        <div className="cardhead"><span className="lbl">{market?.label ?? sym} · {tf.toUpperCase()} · {EX.find((e) => e.id === ex)!.name}</span><span className="mono">{last ? fmt(last.c) : loading ? "Loading…" : "–"}</span></div>
+        <div className="cardhead"><span className="lbl">{market?.label ?? sym} · {tf.toUpperCase()} · {EX.find((e) => e.id === ex)!.name}</span><span className="row gap"><button className={`chip ${showOi ? "on" : ""}`} aria-pressed={showOi} onClick={() => setShowOi(!showOi)}>OI line{showOi && oi === null ? " (n/a)" : ""}</button><span className="mono">{last ? fmt(last.c) : loading ? "Loading…" : "–"}</span></span></div>
         {err && <p className="alert" role="alert">{err}</p>}
         {!loading && !err && data.length > 0 && data.length < MIN_CANDLES && <p className="alert" role="status">Only {data.length} candles on {tf.toUpperCase()} for this market (needs {MIN_CANDLES} to scan). Try a lower timeframe.</p>}
-        <Chart candles={data} analysis={analysis} setup={setup} zone={zone} theme={theme} viewKey={`${ex}|${sym}|${tf}`} />
+        <Chart candles={data} analysis={analysis} setup={setup} zone={zone} theme={theme} viewKey={`${ex}|${sym}|${tf}`} oi={showOi ? oi : null} />
       </div>
       <div className="scanrow">
         <button className="btn long" disabled={!analysis || !!busy} onClick={() => run("long")}>{busy === "long" ? "Scanning…" : "Scan long"}</button>
         <button className="btn short" disabled={!analysis || !!busy} onClick={() => run("short")}>{busy === "short" ? "Scanning…" : "Scan short"}</button>
       </div>
+      {setup && <Result setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks })} onAlert={() => { const z = setup.zones[zone]; addAlert({ exchange: ex, symbol: sym, kind: "zone", lo: z.bottom, hi: z.top, label: `${setup.dir} Zone ${z.rank} entry ${fmt(z.bottom)}–${fmt(z.top)}` }); }} threshold={settings.threshold} />}
       <FundingPanel symbol={sym} />
-      {setup && <Result setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks })} threshold={settings.threshold} />}
+      <PositioningPanel symbol={sym} oi={oi} />
+      <AlertsCard />
       <div className="card">
         <div className="cardhead"><h2>My checklist</h2><span className="lbl">device-only</span></div>
         {setup ? <p className="dim small">Tick the rules that hold for this {setup.dir} setup. Compare against Signal's checks above.</p> : <p className="dim small">Your own rules. Run a scan to tick them next to Signal's checks.</p>}
@@ -80,7 +88,8 @@ export function ScanView({ settings, theme, onJournal }: { settings: Settings; t
   );
 }
 
-function Result({ setup, zone, setZone, onJournal, threshold }: { setup: Setup; zone: number; setZone: (n: number) => void; onJournal: () => void; threshold: number }) {
+function Result({ setup, zone, setZone, onJournal, onAlert, threshold }: { setup: Setup; zone: number; setZone: (n: number) => void; onJournal: () => void; onAlert: () => void; threshold: number }) {
+  const [alerted, setAlerted] = useState<number | null>(null);
   const s = setup;
   return (
     <div className={`card result ${s.dir} rise`}>
@@ -108,7 +117,7 @@ function Result({ setup, zone, setZone, onJournal, threshold }: { setup: Setup; 
         ))}
       </div>
       <p className="dim small">Heatmap levels (dotted, “est. liq”) are a model estimate from volume and assumed leverage, not real positions.</p>
-      <button className="btn primary" onClick={onJournal}>Journal Zone {zone + 1}</button>
+      <div className="row wrap gap"><button className="btn primary" onClick={onJournal}>Journal Zone {zone + 1}</button><button className="btn" onClick={() => { onAlert(); setAlerted(zone); }}>{alerted === zone ? "Alert set ✓" : `Alert when price enters Zone ${zone + 1}`}</button></div>
     </div>
   );
 }
