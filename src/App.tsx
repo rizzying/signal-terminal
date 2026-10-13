@@ -9,10 +9,11 @@ import { Watchlist } from "./ui/Watchlist";
 import { Wallets } from "./ui/Wallets";
 import { MarketView } from "./ui/Market";
 import { BacktestView } from "./ui/Backtest";
+import { CalendarView } from "./ui/Calendar";
 import { activeId, setActiveId, type Strategy } from "./strategies";
 
 type Tab = "scan" | "market" | "watch" | "backtest" | "calendar" | "wallets" | "journal" | "settings";
-const TABS: { id: Tab; name: string; more?: boolean }[] = [{ id: "scan", name: "Scan" }, { id: "market", name: "Market" }, { id: "watch", name: "Watchlist" }, { id: "backtest", name: "Backtest", more: true }, { id: "wallets", name: "Wallets", more: true }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings", more: true }];
+const TABS: { id: Tab; name: string; more?: boolean }[] = [{ id: "scan", name: "Scan" }, { id: "market", name: "Market" }, { id: "watch", name: "Watchlist" }, { id: "backtest", name: "Backtest", more: true }, { id: "calendar", name: "Calendar", more: true }, { id: "wallets", name: "Wallets", more: true }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings", more: true }];
 export default function App() {
   useAlertWatcher();
   const [more, setMore] = useState(false);
@@ -56,6 +57,7 @@ export default function App() {
         {tab === "watch" && <Watchlist settings={settings} onOpen={(ex, sym, tf) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); setTab("scan"); }} />}
         {tab === "market" && <MarketView />}
         {tab === "backtest" && <BacktestView settings={settings} stratId={stratId} theme={theme} />}
+        {tab === "calendar" && <CalendarView />}
         {tab === "wallets" && <Wallets />}
         {tab === "journal" && <JournalView prefill={prefill} clearPrefill={() => setPrefill(null)} />}
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}

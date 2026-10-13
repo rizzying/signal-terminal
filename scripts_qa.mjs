@@ -9,7 +9,7 @@ for (const theme of ["dark", "light"]) for (const w of sizes) {
   await ctx.addInitScript((t) => { localStorage.setItem("sig.theme", t); localStorage.setItem("sig.wallets", JSON.stringify([{ ex: "hyperliquid", address: "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303", name: "HLP vault" }])); }, theme);
   const p = await ctx.newPage(); const errs = [];
   p.on("console", (m) => m.type() === "error" && errs.push(m.text())); p.on("pageerror", (e) => errs.push(e.message));
-  for (const tab of ["scan", "market", "watch", "backtest", "wallets", "journal", "settings"]) {
+  for (const tab of ["scan", "market", "watch", "backtest", "calendar", "wallets", "journal", "settings"]) {
     await p.goto(`${base}/#${tab}`); await p.waitForTimeout(tab === "scan" ? 3500 : 800);
     if (tab === "scan") { await p.getByRole("button", { name: "Scan long" }).click(); await p.waitForTimeout(2500); }
     if (tab === "market") { await p.waitForFunction(() => document.querySelector(".funding table"), null, { timeout: 15000 }).catch(() => {}); await p.waitForTimeout(2500); await p.locator(".funding").screenshot({ path: `docs/qa/funding-${w}-${theme}.png` }); await p.locator(".positioning").screenshot({ path: `docs/qa/positioning-${w}-${theme}.png` }); }
