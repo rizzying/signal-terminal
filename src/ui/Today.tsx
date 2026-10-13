@@ -39,7 +39,7 @@ export function TodayView({ settings, go }: { settings: Settings; go: (tab: "sca
         <p className="dim small">{EXN[ex]} · current setup</p>
         {best === null ? <p className="dim" role="status">Scanning…</p> : best === "err" ? <p className="dim">Couldn't load prices right now.</p> : best === "short" ? <p className="dim">Not enough history on this timeframe.</p> :
           <><p className="big"><span className={`badge ${best.dir}`}>{best.dir}</span> {best.shown ? <b>Setup rule met</b> : <span className="dim">No setup yet</span>} <span className="dim">· {best.band} confidence ({best.confidence}%)</span></p>
-          {z && <dl className="kv"><div><dt>Zone 2 entry</dt><dd className="mono">{fmt(z.bottom)}–{fmt(z.top)}</dd></div><div><dt>Stop</dt><dd className="mono">{fmt(z.stop)}</dd></div><div><dt>TP1</dt><dd className="mono">{fmt(z.t1)} <span className="dim">({z.rr1.toFixed(1)}R)</span></dd></div></dl>}</>}
+          {z && <dl className="tkv"><div><dt>Zone 2 entry</dt><dd className="mono">{fmt(z.bottom)}–{fmt(z.top)}</dd></div><div><dt>Stop</dt><dd className="mono">{fmt(z.stop)}</dd></div><div><dt>TP1</dt><dd className="mono">{fmt(z.t1)} <span className="dim">({z.rr1.toFixed(1)}R)</span></dd></div></dl>}</>}
       </Tile>
       <Tile title="Watchlist" go={() => go("watch")} label="Open watchlist">
         {!snap ? <p className="dim">No watchlist scan yet. Open the watchlist and run it once; it then refreshes by itself while open.</p> :

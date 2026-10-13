@@ -122,15 +122,12 @@ function Result({ analysis, book, ex, setup, zone, setZone, onJournal, onAlert, 
         {s.zones.map((z, i) => (
           <button key={i} role="tab" aria-selected={zone === i} className={`zone ${zone === i ? "on" : ""}`} onClick={() => setZone(i)}>
             <div className="row between"><span className="lbl">Zone {z.rank} · {z.name}</span>{z.ready ? <span className="badge long">In zone</span> : <span className="badge">Wait</span>}</div>
-            <div className="kv">
-              <span>Entry</span><b>{fmt(z.bottom)} – {fmt(z.top)}</b>
-              <span>Median</span><b>{fmt(z.entry)}</b>
-              <span>Stop</span><b className="neg">{fmt(z.stop)}</b>
-              <span>TP1 / TP2</span><b className="pos">{fmt(z.t1)} / {fmt(z.t2)}</b>
-              <span>R:R</span><b>{z.rr1.toFixed(1)}R / {z.rr2.toFixed(1)}R</b>
-            </div>
+            <dl className="zkv">
+              {([["Entry", `${fmt(z.bottom)} – ${fmt(z.top)}`, ""], ["Median", fmt(z.entry), ""], ["Stop", fmt(z.stop), "neg"], ["TP1", fmt(z.t1), "pos"], ["TP2", fmt(z.t2), "pos"], ["R:R TP1 / TP2", `${z.rr1.toFixed(1)}R / ${z.rr2.toFixed(1)}R`, ""]] as const).map(([k, v, c]) => <div className="zr" key={k}><dt>{k}</dt><dd className={c}>{v}</dd></div>)}
+            </dl>
             {z.pastStop ? <span className="alert small">Price is already past the stop: this zone is invalid for now.</span> : z.pastTp1 ? <span className="alert small">Price already beyond TP1. Wait for a retrace into the entry zone.</span> : null}
-            <span className="dim small costs">Costs {fmt(z.costs.total)} = spread {fmt(z.costs.spread)} + fees {fmt(z.costs.fees)}{z.costs.slip ? ` + slippage ${fmt(z.costs.slip)}` : ""}. Stop widened from {fmt(z.rawStop)}.</span>
+            <span className="dim small zcost">Costs {fmt(z.costs.total)} (spread {fmt(z.costs.spread)} + fees {fmt(z.costs.fees)}{z.costs.slip ? ` + slip ${fmt(z.costs.slip)}` : ""})</span>
+            <span className="dim small zcost">Stop widened from {fmt(z.rawStop)}</span>
             <span className="dim small">{z.source}{z.note ? ` · ${z.note}` : ""}</span>
             {(() => { const L = setup.dir === "long"; const lq = analysis?.liq.filter((b) => (L ? b.long : b.short) > 0 && b.price >= z.bottom && b.price <= z.top) ?? []; return lq.length ? <span className="dim small">Est. liq cluster ({L ? "longs" : "shorts"}) inside this entry zone at {lq.map((b) => fmt(b.price)).join(", ")}.</span> : null; })()}
           </button>

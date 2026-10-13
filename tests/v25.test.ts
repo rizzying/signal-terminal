@@ -58,3 +58,11 @@ describe("chart axis labels (regression: est. liq covering Entry top/bottom, BTC
   });
   it("leaves labels alone when there's room", () => { const wide = declutter(lineSpecs(setup, 1, null, col), (p) => (90000 - p)); expect(wide.every((x) => x.label)).toBe(true); expect(wide[0].title).toBe("Entry top"); });
 });
+import { readFileSync } from "node:fs";
+describe("zone card CSS (regression: Today's .kv override broke the zone grid)", () => {
+  it("each class used by the zone card is defined once, as a row list", () => {
+    const css = readFileSync("src/styles.css", "utf8");
+    expect(css.match(/(^|[}\s])\.zkv\s*\{/g)).toHaveLength(1); expect(css).toMatch(/\.zkv \.zr\{display:flex;justify-content:space-between/);
+    expect((css.match(/(^|[}\s])\.kv\s*\{/g) ?? []).length).toBeLessThanOrEqual(1);
+  });
+});
