@@ -88,3 +88,11 @@ export async function hlRange(symbol: string, tf: TF, start: number, end: number
   const r = await hl({ type: "candleSnapshot", req: { coin: symbol, interval: tf, startTime: start, endTime: end } }, f);
   return r.map((k: any) => ({ t: k.t, o: +k.o, h: +k.h, l: +k.l, c: +k.c, v: +k.v }));
 }
+
+const subCache = new Map<string, Candle[]>();
+/** Lower-timeframe candles inside one bar (cached for the session). */
+export async function hlInside(symbol: string, ltf: TF, start: number, ms: number, f?: F): Promise<Candle[]> {
+  const k = `${symbol}|${ltf}|${start}`; const hit = subCache.get(k); if (hit) return hit;
+  const r = (await hlRange(symbol, ltf, start, start + ms - 1, f)).filter((c) => c.t >= start && c.t < start + ms);
+  subCache.set(k, r); return r;
+}

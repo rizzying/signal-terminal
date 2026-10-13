@@ -133,3 +133,6 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .calev.past{opacity:.72}.pm{margin:4px 0 10px}.pmlist{list-style:none;padding:0;margin:6px 0 0;display:grid;gap:4px}.pmlist li{display:grid;grid-template-columns:minmax(6rem,10rem) 1fr 3rem;gap:10px;align-items:center;font-size:13px}
 .pmlist .bar{height:6px;border-radius:6px;background:var(--field);box-shadow:var(--ring);overflow:hidden}.pmlist .bar i{display:block;height:100%;background:var(--accent)}.pmlist b{text-align:right}
 @media (min-width:48rem) and (max-width:72rem){.nav button{padding:8px 7px;font-size:13px}.nav .lg{display:none}}
+.toggles{margin:4px 0 12px}.check{display:flex;gap:8px;align-items:flex-start;font-size:14px;cursor:pointer}.check input{margin-top:3px;accent-color:var(--accent)}
+.btchart.small{height:180px}.badge.verdict.pos{color:var(--pos-ink)}.badge.verdict.neg{color:var(--neg-ink)}
+table.split{width:100%;margin:8px 0}table.split th,table.split td{text-align:right;padding:6px 8px}table.split th[scope=row]{text-align:left;font-weight:500;color:var(--ink-2)}table.split thead th{font-weight:600}table.split thead th small{display:block}

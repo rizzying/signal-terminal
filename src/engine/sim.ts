@@ -14,7 +14,12 @@ export function signalsAt(c: Candle[], startIdx: number, s: Settings, window = 3
   }
   return out;
 }
-export type SimOpts = { zone: 0 | 1 | 2; k: number; tpR: number; exit: 0 | 1 | 2; onClose: boolean; costFrac: number; ttl?: number; from?: number; to?: number };
+/** A candle where the order of events is unknown from OHLC alone. kind "exit": stop and target both inside; "entry": filled and then stop/target in the same candle. */
+export type Amb = { key: string; i: number; t: number; kind: "exit" | "entry"; dir: Dir; fill?: number; stop: number; tgt: number };
+export type Resolution = "stop" | "tp" | "none";
+export type SimOpts = { zone: 0 | 1 | 2; k: number; tpR: number; exit: 0 | 1 | 2; onClose: boolean; costFrac: number; ttl?: number; from?: number; to?: number;
+  /** answers from lower-timeframe candles; missing = conservative (stop first) */ resolved?: Record<string, Resolution>; /** collects ambiguous candles met */ amb?: Amb[] };
+const akey = (kind: string, t: number, stop: number, tgt: number) => `${kind}:${t}:${stop.toPrecision(10)}:${tgt.toPrecision(10)}`;
 export type SimTrade = { dir: Dir; entryT: number; exitT: number; entry: number; exit: number; stop: number; tp1: number; r: number; pct: number; outcome: "tp1" | "stop" | "be" | "partial" | "open" };
 /** exit: 0 = all at tpR; 1 = half at 2R, rest at 3R; 2 = half at 2R, rest stop moved to break-even (rest target 3R). */
 export function simulate(c: Candle[], sig: BarSig[], o: SimOpts): SimTrade[] {
@@ -30,8 +35,9 @@ export function simulate(c: Candle[], sig: BarSig[], o: SimOpts): SimTrade[] {
     const b = c[i];
     if (pos && i > pos.i) {
       const L = pos.dir === "long"; const lvl = (m: number) => (L ? pos!.entry + m * pos!.R : pos!.entry - m * pos!.R);
-      const stopPx = pos.half && o.exit === 2 ? pos.entry : pos.stop; const hitS = L ? b.l <= stopPx : b.h >= stopPx;
-      const tgt = o.exit === 0 ? o.tpR : pos.half ? 3 : 2; const hitT = L ? b.h >= lvl(tgt) : b.l <= lvl(tgt);
+      const stopPx = pos.half && o.exit === 2 ? pos.entry : pos.stop; let hitS = L ? b.l <= stopPx : b.h >= stopPx;
+      const tgt = o.exit === 0 ? o.tpR : pos.half ? 3 : 2; let hitT = L ? b.h >= lvl(tgt) : b.l <= lvl(tgt);
+      if (hitS && hitT) { const key = akey("exit", b.t, stopPx, lvl(tgt)); o.amb?.push({ key, i, t: b.t, kind: "exit", dir: pos.dir, stop: stopPx, tgt: lvl(tgt) }); if (o.resolved?.[key] === "tp") hitS = false; else hitT = false; }
       if (hitS) { push(pos, L ? Math.min(b.o, stopPx) : Math.max(b.o, stopPx), i, pos.half ? (o.exit === 2 ? "be" : "partial") : "stop", 2); pos = null; }
       else if (hitT) { if (o.exit === 0 || pos.half) { push(pos, lvl(tgt), i, pos.half ? "partial" : "tp1", 2); pos = null; } else { pos.half = true;
         const hit3 = L ? b.h >= lvl(3) : b.l <= lvl(3); if (hit3) { push(pos, lvl(3), i, "partial", 2); pos = null; } } }
@@ -42,7 +48,11 @@ export function simulate(c: Candle[], sig: BarSig[], o: SimOpts): SimTrade[] {
       else { const mid = (p.lo + p.hi) / 2; if (L ? b.l <= mid : b.h >= mid) fill = L ? Math.min(b.o, mid) : Math.max(b.o, mid); }
       if (L ? b.c <= p.stop : b.c >= p.stop) pend = null; // invalidated before entry
       else if (fill != null) { const R = Math.abs(fill - p.stop); if (R > 0) { pos = { dir: p.dir, entry: fill, stop: p.stop, R, t: i, half: false, i: o.onClose ? i : i - 1 }; pend = null;
-        if (!o.onClose) { /* touch mode: same-candle stop is possible */ const hs = L ? b.l <= p.stop : b.h >= p.stop; if (hs) { push(pos, p.stop, i, "stop"); pos = null; } } } }
+        if (!o.onClose) { // touch mode: stop or target can follow the fill inside the same candle
+          const tg = L ? fill + o.tpR * R : fill - o.tpR * R; const hs = L ? b.l <= p.stop : b.h >= p.stop; const ht = o.exit === 0 && (L ? b.h >= tg : b.l <= tg);
+          if (hs || ht) { const key = akey("entry", b.t, p.stop, tg); o.amb?.push({ key, i, t: b.t, kind: "entry", dir: p.dir, fill, stop: p.stop, tgt: tg });
+            const res = o.resolved?.[key] ?? (hs ? "stop" : "none");
+            if (res === "stop") { push(pos, p.stop, i, "stop"); pos = null; } else if (res === "tp" && ht) { push(pos, tg, i, "tp1"); pos = null; } } } } }
       else if (i - p.age >= ttl) pend = null;
     }
     if (!pos) { const s = sig[i]; let best: P | null = null; let bc = -1;

@@ -66,7 +66,7 @@ export default function App() {
         {tab === "journal" && <JournalView prefill={prefill} clearPrefill={() => setPrefill(null)} />}
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}
       </main>
-      <footer className="foot dim small">Signal v2.1 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v2.2 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }
