@@ -64,13 +64,13 @@ describe("v1.1 setup rule", () => {
 });
 describe("v1.5 costs", () => {
   const c = mk(wave(300, 0.2));
-  it("min R:R default 3; costs widen the stop and are netted from R:R", () => {
-    expect(DEFAULTS.minRR).toBe(3);
+  it("min R:R default 2 (v2.1 study); costs widen the stop and are netted from R:R", () => {
+    expect(DEFAULTS.minRR).toBe(2); expect(DEFAULTS.stopAtr).toBe(1.5);
     const a = scan(c, "long", DEFAULTS); const b = scan(c, "long", sanitize({ slippagePct: 0.05 }), { costs: { spread: 0.2, feePct: 0.05 } });
     const za = a.zones[1], zb = b.zones[1];
     expect(zb.costs.total).toBeCloseTo(0.2 + zb.entry * 0.001 + zb.entry * 0.001);
     expect(zb.stop).toBeCloseTo(zb.rawStop - zb.costs.total); expect(zb.stop).toBeLessThan(za.stop);
-    expect(zb.rr1).toBeGreaterThanOrEqual(3 - 1e-9);
+    expect(zb.rr1).toBeGreaterThanOrEqual(2 - 1e-9);
     expect(zb.rr1).toBeCloseTo((zb.t1 - zb.entry - zb.costs.total) / (zb.entry - zb.stop));
   });
   it("spread can be turned off", () => { const z = scan(c, "long", sanitize({ useSpread: false }), { costs: { spread: 5, feePct: 0 } }).zones[0]; expect(z.costs.spread).toBe(0); });

@@ -80,7 +80,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
         {!loading && !err && data.length > 0 && data.length < MIN_CANDLES && <p className="alert" role="status">Only {data.length} candles on {tf.toUpperCase()} for this market (needs {MIN_CANDLES} to scan). Try a lower timeframe.</p>}
         <Chart candles={data} analysis={analysis} setup={setup} zone={zone} theme={theme} viewKey={`${ex}|${sym}|${tf}`} oi={showOi ? oi : null} />
       </div>
-      <div className="card controls"><StrategySelect value={stratId} onChange={onPickStrategy} current={settings} /></div>
+      <div className="card controls"><StrategySelect value={stratId} onChange={onPickStrategy} current={settings} zone={zone} /></div>
       <div className="scanrow">
         <button className="btn long" disabled={!analysis || !!busy} onClick={() => run("long")}>{busy === "long" ? "Scanning…" : "Scan long"}</button>
         <button className="btn short" disabled={!analysis || !!busy} onClick={() => run("short")}>{busy === "short" ? "Scanning…" : "Scan short"}</button>

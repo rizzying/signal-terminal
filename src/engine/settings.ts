@@ -3,7 +3,7 @@ export type Settings = {
   emaFast: number; emaSlow: number; atrLen: number;
   fvgMinAtr: number; obMustBreak: boolean; obMaxAgeBars: number; breakerMaxRetests: number;
   inducementLookback: number; useBreakout: boolean; boMult: number; boAvgLen: number; boLookback: number; threshold: number; gateStructure: boolean; minOthers: number; heatmapWeight: number;
-  stopAtr: number; minRR: number; useHtf: boolean;
+  stopAtr: number; minRR: number; useHtf: boolean; entryOnClose: boolean; exitMode: 0 | 1 | 2;
   feeHyperliquid: number; feeBulk: number; feeBinance: number; slippagePct: number; useSpread: boolean;
   weights: Record<SignalKey, number>;
 };
@@ -17,7 +17,7 @@ export const DEFAULTS: Settings = {
   emaFast: 21, emaSlow: 50, atrLen: 14,
   fvgMinAtr: 0.1, obMustBreak: true, obMaxAgeBars: 120, breakerMaxRetests: 1,
   inducementLookback: 20, useBreakout: true, boMult: 1.5, boAvgLen: 20, boLookback: 10, threshold: 0, gateStructure: true, minOthers: 3, heatmapWeight: 0.5,
-  stopAtr: 0.25, minRR: 3, useHtf: false,
+  stopAtr: 1.5, minRR: 2, useHtf: false, entryOnClose: true, exitMode: 0, // from docs/BACKTEST.md (v2.1 study)
   feeHyperliquid: 0.045, feeBulk: 0.05, feeBinance: 0.1, slippagePct: 0, useSpread: true,
   weights: { structure: 1, fvgob: 1, swings: 1, breaker: 1, inducement: 1, rsi: 1, ema: 1, breakout: 1 },
 };
@@ -38,8 +38,8 @@ export const PARAMS: Meta[] = [
   { key: "emaFast", label: "EMA fast", min: 2, max: 200, step: 1, group: "Momentum" },
   { key: "emaSlow", label: "EMA slow", min: 3, max: 400, step: 1, group: "Momentum" },
   { key: "atrLen", label: "ATR length", min: 2, max: 50, step: 1, group: "Risk" },
-  { key: "stopAtr", label: "Stop buffer (× ATR)", min: 0, max: 3, step: 0.05, group: "Risk" },
-  { key: "minRR", label: "Min R:R to TP1 (after costs)", min: 0.5, max: 5, step: 0.1, group: "Risk" },
+  { key: "stopAtr", label: "Stop beyond zone (× ATR) · tested 0.5–2", min: 0, max: 3, step: 0.05, group: "Risk" },
+  { key: "minRR", label: "TP1 at R:R (after costs) · tested 1.5 / 2 / 3", min: 0.5, max: 5, step: 0.1, group: "Risk" },
   { key: "feeHyperliquid", label: "Taker fee Hyperliquid (% per side)", min: 0, max: 1, step: 0.005, group: "Spread + fees" },
   { key: "feeBulk", label: "Taker fee Bulk (% per side)", min: 0, max: 1, step: 0.005, group: "Spread + fees" },
   { key: "feeBinance", label: "Taker fee Binance (% per side)", min: 0, max: 1, step: 0.005, group: "Spread + fees", help: "spot default; 0.05 for futures" },
@@ -51,6 +51,7 @@ export const PARAMS: Meta[] = [
 export function sanitize(s: Partial<Settings>): Settings {
   const o: any = { ...DEFAULTS, ...s, weights: { ...DEFAULTS.weights, ...(s.weights ?? {}) } };
   for (const p of PARAMS) { const v = Number(o[p.key]); o[p.key] = Number.isFinite(v) ? Math.min(p.max, Math.max(p.min, v)) : (DEFAULTS as any)[p.key]; }
+  o.exitMode = [0, 1, 2].includes(Number(o.exitMode)) ? Number(o.exitMode) : 0; o.entryOnClose = o.entryOnClose !== false;
   if (o.emaSlow <= o.emaFast) o.emaSlow = o.emaFast + 1;
   if (o.rsiOS >= o.rsiOB) { o.rsiOS = DEFAULTS.rsiOS; o.rsiOB = DEFAULTS.rsiOB; }
   return o;

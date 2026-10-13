@@ -27,6 +27,10 @@ export default function App() {
       const ps = await db.get<any[]>("presets"); if (ps?.length) await db.set("presets", ps.map((p) => ({ ...p, settings: { ...p.settings, minRR: 3 } })));
       if (s) await db.set("settings", s); await db.set("settingsV", 5);
     }
+    if (v < 6) { // v2.1: backtest-study defaults (stop 1.5×ATR, TP1 at 2R, enter on close in zone) if the old defaults were untouched
+      if (s && s.stopAtr === 0.25 && s.minRR === 3) s = { ...s, stopAtr: 1.5, minRR: 2, entryOnClose: true, exitMode: 0 };
+      if (s) await db.set("settings", s); await db.set("settingsV", 6);
+    }
     if (s) setSettingsS(sanitize(s));
   })(); }, []);
   const setSettings = (s: Settings) => { setSettingsS(s); db.set("settings", s); };
@@ -62,7 +66,7 @@ export default function App() {
         {tab === "journal" && <JournalView prefill={prefill} clearPrefill={() => setPrefill(null)} />}
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}
       </main>
-      <footer className="foot dim small">Signal v2.0 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v2.1 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }

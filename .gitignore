@@ -1,3 +1,5 @@
 node_modules
 dist
 .vercel
+study/run.mjs
+study/signals.mjs

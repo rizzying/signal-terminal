@@ -131,7 +131,7 @@
   "theme": "dark",
   "w": 768,
   "tab": "scan",
-  "overflow": 52,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -139,7 +139,7 @@
   "theme": "dark",
   "w": 768,
   "tab": "market",
-  "overflow": 52,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -147,7 +147,7 @@
   "theme": "dark",
   "w": 768,
   "tab": "watch",
-  "overflow": 52,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -155,7 +155,7 @@
   "theme": "dark",
   "w": 768,
   "tab": "backtest",
-  "overflow": 52,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -163,7 +163,7 @@
   "theme": "dark",
   "w": 768,
   "tab": "calendar",
-  "overflow": 52,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -171,7 +171,7 @@
   "theme": "dark",
   "w": 768,
   "tab": "wallets",
-  "overflow": 52,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -179,7 +179,7 @@
   "theme": "dark",
   "w": 768,
   "tab": "journal",
-  "overflow": 52,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -187,7 +187,7 @@
   "theme": "dark",
   "w": 768,
   "tab": "settings",
-  "overflow": 52,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -451,7 +451,7 @@
   "theme": "light",
   "w": 768,
   "tab": "scan",
-  "overflow": 51,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -459,7 +459,7 @@
   "theme": "light",
   "w": 768,
   "tab": "market",
-  "overflow": 51,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -467,7 +467,7 @@
   "theme": "light",
   "w": 768,
   "tab": "watch",
-  "overflow": 51,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -475,7 +475,7 @@
   "theme": "light",
   "w": 768,
   "tab": "backtest",
-  "overflow": 51,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -483,7 +483,7 @@
   "theme": "light",
   "w": 768,
   "tab": "calendar",
-  "overflow": 51,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -491,7 +491,7 @@
   "theme": "light",
   "w": 768,
   "tab": "wallets",
-  "overflow": 51,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -499,7 +499,7 @@
   "theme": "light",
   "w": 768,
   "tab": "journal",
-  "overflow": 51,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -507,7 +507,7 @@
   "theme": "light",
   "w": 768,
   "tab": "settings",
-  "overflow": 51,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },

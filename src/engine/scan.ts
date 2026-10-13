@@ -185,9 +185,9 @@ export function buildZones(c: Candle[], an: Analysis, dir: Dir, s: Settings, ci?
     const R = Math.abs(entry - stop) || A * 0.1;
     // net reward = price move minus costs; TP must clear minRR after costs
     const need = s.minRR * R + costs.total;
-    const tgts = opp.filter((p) => (bull ? p > entry + need : p < entry - need)).sort((a, b) => (bull ? a - b : b - a));
-    const t1 = tgts[0] ?? (bull ? entry + need : entry - need);
-    const t2 = tgts.find((t) => Math.abs(t - entry) > Math.abs(t1 - entry) * 1.3) ?? (bull ? entry + Math.abs(t1 - entry) * 1.6 : entry - Math.abs(t1 - entry) * 1.6);
+    // TP1 is a fixed R multiple (what the backtest study tested); TP2 = next structure beyond it
+    const t1 = bull ? entry + need : entry - need;
+    const t2 = opp.filter((p) => (bull ? p > t1 : p < t1)).sort((a, b) => (bull ? a - b : b - a)).find((t) => Math.abs(t - entry) > Math.abs(t1 - entry) * 1.3) ?? (bull ? entry + Math.abs(t1 - entry) * 1.6 : entry - Math.abs(t1 - entry) * 1.6);
     const src = z.retests === -1 ? "ATR step (no structure)" : z.kind === "Swing" ? `Swing ${bull ? "low" : "high"}` : `${d === "bull" ? "Bullish" : "Bearish"} ${z.kind}`;
     return { pastTp1: bull ? px >= t1 : px <= t1, pastStop: bull ? px <= stop : px >= stop, costs, rawStop, rank: (k + 1) as 1 | 2 | 3, name: names[k], top: z.top, bottom: z.bottom, entry, stop, t1, t2, rr1: (Math.abs(t1 - entry) - costs.total) / R, rr2: (Math.abs(t2 - entry) - costs.total) / R, source: src, ready: px <= z.top + 1e-9 && px >= z.bottom - 1e-9, note: nudge.note };
   });
