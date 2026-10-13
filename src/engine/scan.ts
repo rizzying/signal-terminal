@@ -151,8 +151,11 @@ export function liqMagnetSignal(c: Candle[], an: Analysis, dir: Dir, s: Settings
   if (!s.useLiqMagnet) return { key: "liqmagnet", name, pass: false, weight: 0, detail: "Off in Settings" };
   if (!an.liq.length) return { key: "liqmagnet", name, pass: false, weight: 0, detail: "Skipped: heatmap off or no volume on this market" };
   const px = c.at(-1)!.c; const cl = heavyClusters(an, dir, px); const zs = buildZones(c, an, dir, s);
-  const hit = zs.filter((z) => cl.some((k) => k.hi >= z.bottom - 0.5 * an.atr && k.lo <= z.top + 0.5 * an.atr));
-  return { key: "liqmagnet", name, pass: hit.length > 0, weight: w, detail: hit.length ? `Heavy est. ${dir === "long" ? "long" : "short"} liq cluster in/near Zone ${hit.map((z) => z.rank).join(", ")}` : cl.length ? `Nearest heavy cluster ${fmt(cl.sort((a, b) => Math.abs(a.p - px) - Math.abs(b.p - px))[0].p)} isn't near a zone` : `No heavy ${dir === "long" ? "long" : "short"} liq cluster ${dir === "long" ? "below" : "above"} price` };
+  const struct = zs.filter((z) => !z.source.startsWith("Liq zone") && !z.source.startsWith("ATR step")); // pure liq zones don't count
+  const hits = struct.flatMap((z) => { const k = cl.find((k) => k.hi >= z.bottom - 0.5 * an.atr && k.lo <= z.top + 0.5 * an.atr); return k ? [{ z, k }] : []; });
+  const detail = hits.length ? hits.map(({ z, k }) => `Liq cluster ~${fmt(k.p)} lines up with ${z.source.replace(/ \+ Liq zone$/, "")} (Zone ${z.rank})`).join("; ")
+    : cl.length ? `Heavy cluster${cl.length > 1 ? "s" : ""} at ${cl.map((k) => fmt(k.p)).slice(0, 2).join(", ")} ${cl.length > 1 ? "don't" : "doesn't"} line up with an OB/FVG/breaker/swing zone` : `No heavy ${dir === "long" ? "long" : "short"} liq cluster ${dir === "long" ? "below" : "above"} price`;
+  return { key: "liqmagnet", name, pass: hits.length > 0, weight: w, detail };
 }
 export const confidence = (sigs: Signal[]) => { const t = sigs.reduce((a, x) => a + x.weight, 0); return t ? Math.round((100 * sigs.reduce((a, x) => a + (x.pass ? x.weight : 0), 0)) / t) : 0; };
 

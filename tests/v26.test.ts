@@ -21,7 +21,7 @@ describe("v2.6 liquidation clusters as entries", () => {
   });
   it("Liq magnet passes when a heavy cluster is in/near a zone; off and no-heatmap skip it", () => {
     const c = flat(); const a = an(bins([[104, 10]]));
-    expect(liqMagnetSignal(c, a, "short", DEFAULTS).pass).toBe(true);
+    expect(liqMagnetSignal(c, a, "short", DEFAULTS).pass).toBe(false); // pure liq zone only
     expect(liqMagnetSignal(c, an([]), "short", DEFAULTS)).toMatchObject({ pass: false, weight: 0 });
     expect(liqMagnetSignal(c, a, "short", sanitize({ useLiqMagnet: false }))).toMatchObject({ pass: false, weight: 0 });
     expect(sanitize({}).useLiqMagnet).toBe(true); expect(sanitize({}).weights.liqmagnet).toBe(1);
@@ -29,5 +29,20 @@ describe("v2.6 liquidation clusters as entries", () => {
   it("is part of the scan, counted in the other-signals tally", () => {
     const s = scan(flat(200), "short", DEFAULTS); const m = s.signals.find((x) => x.key === "liqmagnet")!; expect(m).toBeTruthy();
     expect(s.othersTotal).toBe(s.signals.filter((x) => x.key !== "structure" && x.weight > 0).length);
+  });
+});
+describe("Liq magnet needs structure (rizzy's rule)", () => {
+  it("a pure Liq zone alone doesn't pass", () => {
+    const m = liqMagnetSignal(flat(), an(bins([[104, 10]])), "short", DEFAULTS); expect(m.pass).toBe(false); expect(m.detail).toMatch(/doesn't line up/);
+  });
+  it("passes when the cluster merges into an OB, naming it and the zone", () => {
+    const ob = { top: 103.8, bottom: 103.2, i: 100, kind: "OB" as const, dir: "bear" as const };
+    const m = liqMagnetSignal(flat(), an(bins([[104, 10]]), { obs: [ob] }), "short", DEFAULTS); expect(m.pass).toBe(true); expect(m.detail).toBe("Liq cluster ~104 lines up with Bearish OB (Zone 1)");
+  });
+  it("passes within 0.5 ATR of a structure zone, fails beyond", () => {
+    const fvg = (top: number) => ({ top, bottom: top - 0.3, i: 100, kind: "FVG" as const, dir: "bear" as const });
+    // gap from FVG top to cluster box (cluster ± 0.1 ATR): 0.4 ATR → passes; heatmap snapping needs ≤0.3 so it's not merged
+    expect(liqMagnetSignal(flat(), an(bins([[104, 10]]), { fvgs: [fvg(103.55)] }), "short", DEFAULTS).detail).toMatch(/lines up with Bearish FVG/);
+    expect(liqMagnetSignal(flat(), an(bins([[104, 10]]), { fvgs: [fvg(102.5)] }), "short", DEFAULTS).pass).toBe(false);
   });
 });

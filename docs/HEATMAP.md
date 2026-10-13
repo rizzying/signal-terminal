@@ -12,7 +12,7 @@ So the same coin can show different clusters on Bulk and Hyperliquid. Volume, ma
 
 **How Signal uses it (v2.6).**
 - **Liq zones as entries.** A heavy cluster is at least half the size of the biggest one on that side. Short liquidations above price (for shorts) or long liquidations below price (for longs) count. Price often gets pulled to these, so each one becomes a candidate entry zone ("Liq zone"). It is ranked with order blocks, FVGs and swings. If a cluster sits within 0.3 ATR of an existing zone, that zone is stretched to cover it, and its source reads "… + Liq zone".
-- **Liq magnet signal.** Passes when a heavy cluster is inside one of the entry zones or within 0.5 ATR of it. It's a weighted signal: on by default (weight 1) in "Signal default", and you can switch it off or reweight it in Settings. It's off in the other built-in strategies so their tested numbers stay valid.
+- **Liq magnet signal.** Passes only when a heavy cluster lines up with a *structure* zone (order block, FVG, breaker or swing): either the cluster was merged into it or it sits within 0.5 ATR of it. A "Liq zone" made from a cluster alone doesn't count. Example detail: "Liq cluster ~93,478 lines up with Bearish OB (Zone 2)". It's a weighted signal: on by default (weight 1) in "Signal default", and you can switch it off or reweight it in Settings. It's off in the other built-in strategies so their tested numbers stay valid.
 - **Stops.** The stop sits beyond the whole zone, cluster included, plus the ATR buffer and costs. A cluster just past the stop pushes the stop further out. A sweep through the cluster shouldn't stop you out.
 - **Chart.** Dotted grey "Shorts liq zone" / "Longs liq zone" lines show up to 3 of the heaviest clusters on the trade side.
 
