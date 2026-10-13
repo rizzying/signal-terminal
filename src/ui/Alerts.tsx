@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { candles, type Exchange } from "../api/markets";
-import { hits, loadAlerts, notify, saveAlerts, type Alert } from "../alerts";
+import { hitsRange, loadAlerts, notify, saveAlerts, type Alert } from "../alerts";
 import { fmt } from "../engine/scan";
 
 /** Polls prices for active alerts every 20s while the app is open. */
@@ -8,10 +8,14 @@ export function useAlertWatcher() {
   useEffect(() => {
     const tick = async () => {
       const as = loadAlerts(); const live = as.filter((a) => !a.firedAt); if (!live.length) return;
-      const keys = [...new Set(live.map((a) => `${a.exchange}|${a.symbol}`))]; const px: Record<string, number> = {};
-      await Promise.all(keys.map(async (k) => { const [ex, s] = k.split("|"); try { px[k] = (await candles(ex as Exchange, s, "15m", 2)).at(-1)!.c; } catch { /* skip */ } }));
+      const keys = [...new Set(live.map((a) => `${a.exchange}|${a.symbol}`))]; const cs: Record<string, { t: number; h: number; l: number; c: number }[]> = {};
+      await Promise.all(keys.map(async (k) => { const [ex, s] = k.split("|"); try { cs[k] = await candles(ex as Exchange, s, "1m", 30); } catch { /* skip */ } }));
       let changed = false;
-      for (const a of as) { const p = px[`${a.exchange}|${a.symbol}`]; if (!a.firedAt && p != null && hits(a, p)) { a.firedAt = Date.now(); changed = true; notify(`Signal · ${a.symbol}`, `${a.label} (price ${fmt(p)})`); } }
+      for (const a of as) { const c = cs[`${a.exchange}|${a.symbol}`]; if (a.firedAt || !c?.length) continue;
+        // 1m candles since the alert was set, so a quick wick through the level between checks still counts
+        const since = c.filter((k) => k.t + 6e4 > a.createdAt); if (!since.length) continue;
+        const lo = Math.min(...since.map((k) => k.l)), hi = Math.max(...since.map((k) => k.h)), p = c.at(-1)!.c;
+        if (hitsRange(a, lo, hi)) { a.firedAt = Date.now(); changed = true; notify(`Signal · ${a.symbol}`, `${a.label} (price ${fmt(p)})`); } }
       if (changed) saveAlerts(as);
     };
     tick(); const t = setInterval(tick, 20_000); return () => clearInterval(t);

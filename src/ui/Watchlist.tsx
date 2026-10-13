@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { candles, tfsFor, type Exchange, type TF } from "../api/markets";
-import { fmt, scan, type Setup } from "../engine/scan";
+import { fmt, MIN_CANDLES, scan, type Setup } from "../engine/scan";
 import type { Settings } from "../engine/settings";
 
 const DEF: Record<Exchange, string[]> = {
@@ -20,7 +20,7 @@ export function Watchlist({ settings, onOpen }: { settings: Settings; onOpen: (e
     const syms = [...new Set(list.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))].slice(0, 20); localStorage.setItem(key(ex), syms.join(", "));
     const out: Row[] = []; let n = 0; setProg(`0/${syms.length}`);
     await Promise.all(syms.map(async (symbol) => {
-      try { const c = await candles(ex, symbol, tf, 400); const L = scan(c, "long", settings), S = scan(c, "short", settings);
+      try { const c = await candles(ex, symbol, tf, 400); if (c.length < MIN_CANDLES) throw new Error(c.length ? `Only ${c.length} candles on ${tf}` : `No candles: not listed on this exchange?`); const L = scan(c, "long", settings), S = scan(c, "short", settings);
         const score = (x: Setup) => (x.shown ? 1000 : 0) + x.confidence + Math.max(...x.zones.map((z) => z.rr1));
         out.push({ symbol, best: score(L) >= score(S) ? L : S }); }
       catch (e: any) { out.push({ symbol, err: e.message ?? "failed" }); }

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useVisibleInterval } from "./useVisibleInterval";
+import { useEffect, useRef, useState } from "react";
 import { baseAsset } from "../api/funding";
 import { longShort, oiChange, recentLiqs, type Liq, type LS, type OIPoint } from "../api/positioning";
 import { fmt } from "../engine/scan";
@@ -8,8 +9,10 @@ const pct = (x: number | null) => (x == null ? "–" : `${x >= 0 ? "+" : "−"}$
 const time = (t: number) => new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 export function PositioningPanel({ symbol, oi }: { symbol: string; oi: OIPoint[] | null }) {
   const base = baseAsset(symbol); const [ls, setLs] = useState<LS[] | null>(null); const [lq, setLq] = useState<{ liqs: Liq[]; failed: string[] } | null>(null);
-  const load = () => { longShort(base).then(setLs); recentLiqs(base).then(setLq); };
-  useEffect(() => { setLs(null); setLq(null); load(); const t = setInterval(load, 60_000); return () => clearInterval(t); }, [base]);
+  const gen = useRef(0);
+  const load = () => { const g = gen.current; longShort(base).then((x) => g === gen.current && setLs(x)).catch(() => {}); recentLiqs(base).then((x) => g === gen.current && setLq(x)).catch(() => {}); };
+  useEffect(() => { gen.current++; setLs(null); setLq(null); return () => { gen.current++; }; }, [base]);
+  useVisibleInterval(load, 60_000, [base]);
   const last = oi?.at(-1); const day = oi && oi.length > 1 ? Math.round(8.64e7 / (oi[1].t - oi[0].t)) : 0;
   const longUsd = lq?.liqs.filter((l) => l.side === "long").reduce((a, l) => a + l.usd, 0) ?? 0, shortUsd = lq?.liqs.filter((l) => l.side === "short").reduce((a, l) => a + l.usd, 0) ?? 0;
   return (

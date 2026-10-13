@@ -1,20 +1,20 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { DEFAULTS, sanitize, type Settings } from "./engine/settings";
 import { db, uid, type Trade } from "./journal/db";
-import { JournalView } from "./ui/Journal";
 import { ScanView, type Draft } from "./ui/Scan";
-import { SettingsView } from "./ui/SettingsView";
 import { useAlertWatcher } from "./ui/Alerts";
-import { Watchlist } from "./ui/Watchlist";
-import { Wallets } from "./ui/Wallets";
-import { MarketView } from "./ui/Market";
-import { BacktestView } from "./ui/Backtest";
-import { CalendarView } from "./ui/Calendar";
 import { useLabs, getLabs } from "./labs";
 import { activeId, setActiveId, type Strategy } from "./strategies";
 
 type Tab = "scan" | "market" | "watch" | "backtest" | "calendar" | "wallets" | "journal" | "settings";
 const ALL_TABS: { id: Tab; name: string; more?: boolean; labs?: boolean }[] = [{ id: "scan", name: "Scan" }, { id: "market", name: "Market" }, { id: "watch", name: "Watchlist" }, { id: "backtest", name: "Backtest", more: true, labs: true }, { id: "calendar", name: "Calendar", more: true }, { id: "wallets", name: "Wallets", more: true }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings", more: true }];
+const Watchlist = lazy(() => import("./ui/Watchlist").then((m) => ({ default: m.Watchlist })));
+const Wallets = lazy(() => import("./ui/Wallets").then((m) => ({ default: m.Wallets })));
+const MarketView = lazy(() => import("./ui/Market").then((m) => ({ default: m.MarketView })));
+const BacktestView = lazy(() => import("./ui/Backtest").then((m) => ({ default: m.BacktestView })));
+const CalendarView = lazy(() => import("./ui/Calendar").then((m) => ({ default: m.CalendarView })));
+const JournalView = lazy(() => import("./ui/Journal").then((m) => ({ default: m.JournalView })));
+const SettingsView = lazy(() => import("./ui/SettingsView").then((m) => ({ default: m.SettingsView })));
 export default function App() {
   useAlertWatcher();
   const [more, setMore] = useState(false);
@@ -23,7 +23,9 @@ export default function App() {
   useEffect(() => { if (tab === "backtest" && !labs.backtest) setTab("scan"); }, [tab, labs.backtest]);
   const [theme, setTheme] = useState(() => localStorage.getItem("sig.theme") || "dark");
   const [settings, setSettingsS] = useState<Settings>(DEFAULTS); const [prefill, setPrefill] = useState<Trade | null>(null);
-  useEffect(() => { (async () => {
+  const [stratId, setStratId] = useState("b-default");
+  const [ready, setReady] = useState(false); // settings + strategy loaded from IndexedDB before the first scan (avoids a double scan and layout shift)
+  useEffect(() => { (async () => { try {
     let s = await db.get<Settings>("settings"); const v = (await db.get<number>("settingsV")) ?? 0;
     if (v < 5) { // v1.5 migration: min R:R default becomes 3 (current settings + saved presets)
       if (s) s = { ...s, minRR: 3, ...((s as any).gateStructure === undefined ? { threshold: 0, useHtf: false } : {}) };
@@ -34,11 +36,9 @@ export default function App() {
       if (s && s.stopAtr === 0.25 && s.minRR === 3) s = { ...s, stopAtr: 1.5, minRR: 2, entryOnClose: true, exitMode: 0 };
       if (s) await db.set("settings", s); await db.set("settingsV", 6);
     }
-    if (s) setSettingsS(sanitize(s));
-  })(); }, []);
+    if (s) setSettingsS(sanitize(s)); setStratId(await activeId());
+  } catch { /* storage blocked: run with defaults */ } finally { setReady(true); } })(); }, []);
   const setSettings = (s: Settings) => { setSettingsS(s); db.set("settings", s); };
-  const [stratId, setStratId] = useState("b-default");
-  useEffect(() => { activeId().then(setStratId); }, []);
   const pickStrategy = (s: Strategy) => { setSettings(s.settings); setStratId(s.id); setActiveId(s.id); };
   useEffect(() => { document.documentElement.classList.toggle("dark", theme === "dark"); document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#08080a" : "#ffffff"); localStorage.setItem("sig.theme", theme); }, [theme]);
   useEffect(() => { const f = () => { const h = location.hash.slice(1) as Tab; if (ALL_TABS.some((t) => t.id === h)) setTab(h); }; addEventListener("hashchange", f); return () => removeEventListener("hashchange", f); }, []);
@@ -60,7 +60,9 @@ export default function App() {
         <button className="btn ghost sm" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={() => { const t = theme === "dark" ? "light" : "dark"; document.documentElement.classList.toggle("dark", t === "dark"); setTheme(t); }}>{theme === "dark" ? "Light" : "Dark"}</button>
       </header>
       <main>
+        {!ready ? <p className="dim small center" role="status">Loading…</p> : <>
         {tab === "scan" && <ScanView stratId={stratId} onPickStrategy={pickStrategy} settings={settings} theme={theme} onJournal={journal} />}
+        <Suspense fallback={<p className="dim small center" role="status">Loading…</p>}>
         {tab === "watch" && <Watchlist settings={settings} onOpen={(ex, sym, tf) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); setTab("scan"); }} />}
         {tab === "market" && <MarketView />}
         {tab === "backtest" && labs.backtest && <BacktestView settings={settings} stratId={stratId} theme={theme} />}
@@ -68,8 +70,9 @@ export default function App() {
         {tab === "wallets" && <Wallets />}
         {tab === "journal" && <JournalView prefill={prefill} clearPrefill={() => setPrefill(null)} />}
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}
+        </Suspense></>}
       </main>
-      <footer className="foot dim small">Signal v2.3 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v2.4 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }

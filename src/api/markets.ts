@@ -19,15 +19,24 @@ const BN = "https://data-api.binance.vision/api/v3";
 
 export class MarketError extends Error {}
 
-export async function getJson(ex: Exchange, url: string, init?: RequestInit, f: F = (...a) => fetch(...a), attempt = 0): Promise<any> {
+const inflight = new Map<string, Promise<any>>();
+const TIMEOUT_MS = 15_000;
+/** Rate-limited JSON fetch with retries, a 15s timeout, clear errors and de-duplication of identical in-flight requests. */
+export function getJson(ex: Exchange, url: string, init?: RequestInit, f: F = (...a) => fetch(...a)): Promise<any> {
+  const k = `${ex} ${url} ${typeof init?.body === "string" ? init.body : ""}`; const hit = inflight.get(k); if (hit) return hit;
+  const p = fetchJson(ex, url, init, f).finally(() => inflight.delete(k)); inflight.set(k, p); return p;
+}
+async function fetchJson(ex: Exchange, url: string, init: RequestInit | undefined, f: F, attempt = 0): Promise<any> {
   await buckets[ex].take();
-  let r: Response;
-  try { r = await f(url, init); } catch {
-    if (attempt < 2) { await new Promise((s) => setTimeout(s, 800 * 2 ** attempt)); return getJson(ex, url, init, f, attempt + 1); }
-    throw new MarketError(`Can't reach ${ex} (offline or blocked).`);
-  }
-  if ((r.status === 429 || r.status >= 500) && attempt < 3) { await new Promise((s) => setTimeout(s, 1000 * 2 ** attempt)); return getJson(ex, url, init, f, attempt + 1); }
-  if (!r.ok) throw new MarketError(`${ex} returned ${r.status}`);
+  let r: Response; const ac = typeof AbortController !== "undefined" ? new AbortController() : null; const to = ac ? setTimeout(() => ac.abort(), TIMEOUT_MS) : null;
+  try { r = await f(url, ac ? { ...init, signal: ac.signal } : init); } catch {
+    if (attempt < 2) { await new Promise((s) => setTimeout(s, 800 * 2 ** attempt)); return fetchJson(ex, url, init, f, attempt + 1); }
+    throw new MarketError(`Can't reach ${ex} (offline, slow or blocked).`);
+  } finally { if (to) clearTimeout(to); }
+  if (r.status >= 500 && ex === "hyperliquid") { const t = await r.text().catch(() => ""); if (t.trim() === "null") throw new MarketError("Not listed on Hyperliquid (or no data for this request)."); r = new Response(t, { status: r.status }); }
+  if ((r.status === 429 || r.status >= 500) && attempt < 3) { await new Promise((s) => setTimeout(s, 1000 * 2 ** attempt)); return fetchJson(ex, url, init, f, attempt + 1); }
+  if (!r.ok) { let msg = ""; try { const j = await r.json(); msg = j?.msg || j?.message || j?.error || ""; } catch { /* no body */ }
+    throw new MarketError(r.status === 429 ? `${ex} is rate-limiting requests; try again in a minute.` : r.status === 400 || r.status === 404 ? `Not available on ${ex}${msg ? ` (${msg})` : ""}.` : `${ex} returned ${r.status}${msg ? `: ${msg}` : ""}.`); }
   return r.json();
 }
 const hl = (body: object, f?: F) => getJson("hyperliquid", HL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, f);
@@ -89,10 +98,3 @@ export async function hlRange(symbol: string, tf: TF, start: number, end: number
   return r.map((k: any) => ({ t: k.t, o: +k.o, h: +k.h, l: +k.l, c: +k.c, v: +k.v }));
 }
 
-const subCache = new Map<string, Candle[]>();
-/** Lower-timeframe candles inside one bar (cached for the session). */
-export async function hlInside(symbol: string, ltf: TF, start: number, ms: number, f?: F): Promise<Candle[]> {
-  const k = `${symbol}|${ltf}|${start}`; const hit = subCache.get(k); if (hit) return hit;
-  const r = (await hlRange(symbol, ltf, start, start + ms - 1, f)).filter((c) => c.t >= start && c.t < start + ms);
-  subCache.set(k, r); return r;
-}

@@ -1,3 +1,4 @@
+import { useVisibleInterval } from "./useVisibleInterval";
 import { useEffect, useState } from "react";
 import { isAddress, walletSnapshot, type WSnap } from "../api/wallets";
 import { fmt } from "../engine/scan";
@@ -11,7 +12,7 @@ export function Wallets() {
   const [ex, setEx] = useState<W["ex"]>("hyperliquid"); const [addr, setAddr] = useState(""); const [name, setName] = useState(""); const [err, setErr] = useState<string | null>(null);
   const save = (x: W[]) => { setWs(x); localStorage.setItem(K, JSON.stringify(x)); };
   const refresh = () => ws.forEach((w) => walletSnapshot(w.ex, w.address).then((s) => setSnaps((p) => ({ ...p, [w.address]: s }))).catch((e) => setSnaps((p) => ({ ...p, [w.address]: e.message ?? "failed" }))));
-  useEffect(() => { refresh(); const t = setInterval(refresh, 30_000); return () => clearInterval(t); }, [ws]);
+  useVisibleInterval(refresh, 30_000, [ws]);
   return (
     <section className="stack rise">
       <div className="card">

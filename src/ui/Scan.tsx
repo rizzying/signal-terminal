@@ -39,8 +39,8 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
     loadCandles(ex, sym, tf, 400).then((c) => { if (live) setData(c); }).catch((e) => live && setErr(String(e.message ?? e))).finally(() => live && setLoading(false));
     return () => { live = false; };
   }, [ex, sym, tf, markets, marketsFor]);
-  const [showOi, setShowOi] = useState(() => localStorage.getItem("sig.oi") !== "0"); const [oi, setOi] = useState<OIPoint[] | null>(null);
-  useEffect(() => { localStorage.setItem("sig.oi", showOi ? "1" : "0"); if (!showOi) { setOi(null); return; } let live = true; oiHistory(baseAsset(sym), tf, 400).then((x) => live && setOi(x)).catch(() => live && setOi(null)); return () => { live = false; }; }, [sym, tf, showOi]);
+  const [showOi, setShowOi] = useState(() => localStorage.getItem("sig.oi") !== "0"); const [oi, setOi] = useState<OIPoint[] | null | undefined>(undefined); // undefined = loading, null = not available
+  useEffect(() => { localStorage.setItem("sig.oi", showOi ? "1" : "0"); if (!showOi) { setOi(null); return; } let live = true; setOi(undefined); oiHistory(baseAsset(sym), tf, 400).then((x) => live && setOi(x)).catch(() => live && setOi(null)); return () => { live = false; }; }, [sym, tf, showOi]);
   const market = markets.find((m) => m.symbol === sym);
   const analysis = useMemo(() => (data.length >= MIN_CANDLES ? analyze(data, settings, market?.maxLev) : null), [data, settings, market]);
   const filtered = useMemo(() => { const s = q.trim().toLowerCase(); return (s ? markets.filter((m) => m.label.toLowerCase().includes(s) || m.symbol.toLowerCase().includes(s)) : markets).slice(0, 60); }, [q, markets]);
@@ -78,7 +78,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
         <div className="cardhead"><span className="lbl">{market?.label ?? sym} · {tf.toUpperCase()} · {EX.find((e) => e.id === ex)!.name}</span><span className="row gap"><button className={`chip ${showOi ? "on" : ""}`} aria-pressed={showOi} onClick={() => setShowOi(!showOi)}>OI line{showOi && oi === null ? " (n/a)" : ""}</button><span className="mono">{last ? fmt(last.c) : loading ? "Loading…" : "–"}</span></span></div>
         {err && <p className="alert" role="alert">{err}</p>}
         {!loading && !err && data.length > 0 && data.length < MIN_CANDLES && <p className="alert" role="status">Only {data.length} candles on {tf.toUpperCase()} for this market (needs {MIN_CANDLES} to scan). Try a lower timeframe.</p>}
-        <Chart candles={data} analysis={analysis} setup={setup} zone={zone} theme={theme} viewKey={`${ex}|${sym}|${tf}`} oi={showOi ? oi : null} />
+        <Chart candles={data} analysis={analysis} setup={setup} zone={zone} theme={theme} viewKey={`${ex}|${sym}|${tf}`} oi={showOi ? oi ?? null : null} />
       </div>
       <div className="card controls"><StrategySelect value={stratId} onChange={onPickStrategy} current={settings} zone={zone} /></div>
       <div className="scanrow">

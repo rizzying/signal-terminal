@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useVisibleInterval } from "./useVisibleInterval";
+import { useEffect, useRef, useState } from "react";
 import { baseAsset, bestSpread, fetchFunding, SKIPPED, to8h, toApr, type FundingResult } from "../api/funding";
 
 const pct = (x: number, d = 4) => `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(d)}%`;
@@ -6,8 +7,10 @@ const cls = (x: number) => (x > 0 ? "pos" : x < 0 ? "neg" : "");
 export function FundingPanel({ symbol }: { symbol: string }) {
   const [r, setR] = useState<FundingResult | null>(null); const [loading, setLoading] = useState(false); const [at, setAt] = useState<number | null>(null);
   const base = baseAsset(symbol);
-  const load = () => { setLoading(true); fetchFunding(symbol).then((x) => { setR(x); setAt(Date.now()); }).finally(() => setLoading(false)); };
-  useEffect(() => { setR(null); load(); const t = setInterval(load, 60_000); return () => clearInterval(t); }, [base]);
+  const gen = useRef(0);
+  const load = () => { const g = gen.current; setLoading(true); fetchFunding(symbol).then((x) => { if (g === gen.current) { setR(x); setAt(Date.now()); } }).catch(() => {}).finally(() => g === gen.current && setLoading(false)); };
+  useEffect(() => { gen.current++; setR(null); return () => { gen.current++; }; }, [base]);
+  useVisibleInterval(load, 60_000, [base]);
   const sp = r ? bestSpread(r.rows) : null;
   return (
     <div className="card funding">

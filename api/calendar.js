@@ -5,7 +5,8 @@ const FED = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm";
 const GAMMA = "https://gamma-api.polymarket.com";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const UA = { "user-agent": "Mozilla/5.0 (Signal terminal; public calendar)" };
-const j = async (u) => { const r = await fetch(u, { headers: UA }); if (!r.ok) throw new Error(`${r.status} ${u}`); return r.json(); };
+const safe = (u) => u.replace(/api_key=[^&]+/, "api_key=***"); // never echo the FRED key in errors or logs
+const j = async (u) => { const r = await fetch(u, { headers: UA, signal: AbortSignal.timeout(8000) }); if (!r.ok) throw new Error(`${r.status} ${safe(u)}`); return r.json(); };
 
 // ---- FRED (server-side key only; never sent to the browser) ----
 const FRED = "https://api.stlouisfed.org/fred";
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
   const now = new Date(); const ym = now.toISOString().slice(0, 7); const notes = [];
   let ff = [], fomc = [];
   try { ff = (await j(FF)).filter((e) => e.country === "USD" && e.impact === "High"); } catch (e) { notes.push("ForexFactory feed unavailable right now."); }
-  try { const h = await (await fetch(FED, { headers: UA })).text(); fomc = fomcDates(h, now.getUTCFullYear()); } catch { notes.push("Fed calendar unavailable right now."); }
+  try { const h = await (await fetch(FED, { headers: UA, signal: AbortSignal.timeout(8000) })).text(); fomc = fomcDates(h, now.getUTCFullYear()); } catch { notes.push("Fed calendar unavailable right now."); }
   const key = process.env.FRED_API_KEY; let fred = [];
   if (key) { try { fred = await fredEvents(key, ym, now.getTime()); } catch { notes.push("FRED release calendar unavailable right now; showing this week's ForexFactory events only."); } }
   else notes.push("Full-month dates and actuals need the FRED_API_KEY server setting; showing this week's ForexFactory events only.");
