@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 type PM = { title: string; url: string; outcomes: { label: string; p: number }[]; volume: number | null };
-export type CalEvent = { title: string; time: string; forecast: string | null; previous: string | null; actual: string | null; source: string; polymarket?: PM | null };
+export type CalEvent = { title: string; time: string; forecast: string | null; previous: string | null; actual: string | null; source: string; polymarket?: PM | null; pendingActual?: boolean };
 type Cal = { month: string; generatedAt: string; events: CalEvent[]; notes: string[]; coverage: string };
 const wib = (t: string, o: Intl.DateTimeFormatOptions) => new Date(t).toLocaleString("en-GB", { timeZone: "Asia/Jakarta", ...o });
 const num = (s: string | null) => (s == null || s === "" ? null : parseFloat(s.replace(/[^\d.-]/g, "")));
@@ -27,6 +27,7 @@ export function CalendarView() {
         {!cal && !err && <p className="dim">Loading…</p>}
         {err && <p className="note warn" role="alert">{err}</p>}
         {cal && <p className="dim small">{cal.coverage} {cal.notes.join(" ")}</p>}
+        {cal && cal.events.some((e) => e.actual) && <p className="dim small">Actuals are computed from the official seasonally adjusted series on FRED; they can differ by a rounding step from the headline print.</p>}
         {cal && !cal.events.length && <p className="note">No high-impact US events found for this period.</p>}
       </div>
       {cal?.events.map((e, i) => { const r = ruleOfThumb(e); const past = Date.parse(e.time) < now;
@@ -36,7 +37,7 @@ export function CalendarView() {
             <div className="stats">
               <div><span className="lbl">Forecast</span><b className="mono">{e.forecast ?? "–"}</b></div>
               <div><span className="lbl">Previous</span><b className="mono">{e.previous ?? "–"}</b></div>
-              <div><span className="lbl">Actual</span><b className="mono">{e.actual ?? (past ? "not in free feed" : "pending")}</b></div>
+              <div><span className="lbl">Actual</span><b className="mono">{e.actual ?? (past ? (e.pendingActual ? "awaiting FRED" : "not available") : "pending")}</b></div>
             </div>
             {e.polymarket && <div className="pm"><span className="lbl">Polymarket odds · <a href={e.polymarket.url} target="_blank" rel="noopener noreferrer">{e.polymarket.title}</a></span>
               <ul className="pmlist">{e.polymarket.outcomes.map((o) => <li key={o.label}><span>{o.label}</span><span className="bar" aria-hidden><i style={{ width: `${Math.round(o.p * 100)}%` }} /></span><b className="mono">{Math.round(o.p * 100)}%</b></li>)}</ul></div>}
