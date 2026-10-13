@@ -15,7 +15,7 @@ export const css = (v: string) => {
   cv.clearRect(0, 0, 1, 1); cv.fillStyle = "#888"; cv.fillStyle = resolved; cv.fillRect(0, 0, 1, 1);
   const [r, g, b, a] = cv.getImageData(0, 0, 1, 1).data; return `rgba(${r},${g},${b},${(a / 255).toFixed(3)})`;
 };
-export function Chart({ candles, analysis, setup, zone, theme, viewKey, oi, live }: { live?: Candle | null; candles: Candle[]; analysis: Analysis | null; setup: Setup | null; zone: number; theme: string; viewKey: string; oi?: OIPoint[] | null }) {
+export function Chart({ candles, analysis, setup, zone, theme, viewKey, oi, live, yourLiq = null }: { yourLiq?: number | null; live?: Candle | null; candles: Candle[]; analysis: Analysis | null; setup: Setup | null; zone: number; theme: string; viewKey: string; oi?: OIPoint[] | null }) {
   const oiSeries = useRef<ISeriesApi<"Line"> | null>(null);
   const el = useRef<HTMLDivElement>(null); const chart = useRef<IChartApi | null>(null); const series = useRef<ISeriesApi<"Candlestick"> | null>(null); const lines = useRef<PriceLines<IPriceLine> | null>(null); const [ready, setReady] = useState(0);
   useEffect(() => {
@@ -52,7 +52,7 @@ export function Chart({ candles, analysis, setup, zone, theme, viewKey, oi, live
     return () => { cancelAnimationFrame(raf); ro.disconnect(); try { c.timeScale().unsubscribeVisibleLogicalRangeChange(f); } catch { /* removed */ } };
   }, [ready]);
   drawRef.current = (force?: boolean) => drawLines(force);
-  function drawLines(force = true) { const sp = lineSpecs(setup, zone, analysis, { accent: css("--accent"), neg: css("--neg"), pos: css("--pos"), warn: css("--warn") }); const s = series.current; lines.current?.sync(s ? declutter(sp, (p) => s.priceToCoordinate(p)) : sp, force); if (el.current) el.current.dataset.lines = String(lines.current?.count ?? 0); }
+  function drawLines(force = true) { const sp = lineSpecs(setup, zone, analysis, { accent: css("--accent"), neg: css("--neg"), pos: css("--pos"), warn: css("--ink-3") }, yourLiq); const s = series.current; lines.current?.sync(s ? declutter(sp, (p) => s.priceToCoordinate(p)) : sp, force); if (el.current) el.current.dataset.lines = String(lines.current?.count ?? 0); }
   useEffect(() => {
     const s = series.current; if (!s) return;
     drawLines();
@@ -64,7 +64,7 @@ export function Chart({ candles, analysis, setup, zone, theme, viewKey, oi, live
       marks.sort((a, b) => (a.time as number) - (b.time as number));
     }
     s.setMarkers(marks);
-  }, [analysis, setup, zone, theme, candles, viewKey, ready]);
+  }, [analysis, setup, zone, theme, candles, viewKey, ready, yourLiq]);
   useEffect(() => {
     const c = chart.current; if (!c) return;
     if (!oi?.length) { if (oiSeries.current) { c.removeSeries(oiSeries.current); oiSeries.current = null; } return; }

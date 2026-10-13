@@ -48,7 +48,7 @@ export default function App() {
   const journal = (d: Draft) => {
     const z = d.setup.zones[d.zone];
     setPrefill({ id: uid(), createdAt: Date.now(), exchange: d.exchange, symbol: d.symbol, tf: d.tf, side: d.setup.dir, entry: +z.entry.toPrecision(8), stop: +z.stop.toPrecision(8), size: 0,
-      signals: d.setup.signals.filter((s) => s.pass).map((s) => s.name), confidence: d.setup.confidence, zone: z.rank, settings, checklist: d.checklist, source: "scan" });
+      signals: d.setup.signals.filter((s) => s.pass).map((s) => s.name), confidence: d.setup.confidence, zone: z.rank, settings, checklist: d.checklist, source: "scan", leverage: d.leverage, liq: d.liq != null ? +d.liq.toPrecision(8) : undefined });
     setTab("journal");
   };
   return (

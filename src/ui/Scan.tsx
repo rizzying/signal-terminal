@@ -1,4 +1,5 @@
 import { useLiveCandle } from "./useLiveCandle";
+import { checkLiq, mmrFor } from "../engine/liq";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { candles as loadCandles, feeFor, marketsCached, roundTick, tfsFor, topOfBook, type Book, type Exchange, type Market, type TF } from "../api/markets";
 import type { Candle } from "../engine/indicators";
@@ -15,13 +16,14 @@ import { oiHistory, type OIPoint } from "../api/positioning";
 const EX: { id: Exchange; name: string }[] = [{ id: "hyperliquid", name: "Hyperliquid" }, { id: "bulk", name: "Bulk" }, { id: "binance", name: "Binance" }];
 const DEF_SYM: Record<Exchange, string> = { hyperliquid: "BTC", bulk: "BTC-USD", binance: "BTCUSDT" };
 type Cmp = { symbol: string; label: string; setup: Setup; book: Book | null; at: number };
-export type Draft = { exchange: Exchange; symbol: string; tf: TF; setup: Setup; zone: number; checklist: Record<string, boolean> };
+export type Draft = { exchange: Exchange; symbol: string; tf: TF; setup: Setup; zone: number; checklist: Record<string, boolean>; leverage?: number; liq?: number };
 
 export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }: { settings: Settings; theme: string; onJournal: (d: Draft) => void; stratId: string; onPickStrategy: (s: Strategy) => void }) {
   const [ex, setEx] = useState<Exchange>(() => (localStorage.getItem("sig.ex") as Exchange) || "hyperliquid");
   const [sym, setSym] = useState<string>(() => localStorage.getItem("sig.sym") || DEF_SYM[ex]);
   const [tf, setTf] = useState<TF>(() => (localStorage.getItem("sig.tf") as TF) || "4h");
   const [missing, setMissing] = useState<string | null>(null);
+  const [lev, setLev] = useState(settings.leverage ?? 5); useEffect(() => setLev(settings.leverage ?? 5), [settings.leverage]);
   const [markets, setMarkets] = useState<Market[]>([]); const [marketsFor, setMarketsFor] = useState<Exchange | null>(null); const [q, setQ] = useState(""); const [open, setOpen] = useState(false);
   const [data, setData] = useState<Candle[]>([]); const [err, setErr] = useState<string | null>(null); const [loading, setLoading] = useState(false);
   const [setup, setSetup] = useState<Setup | null>(null); const [zone, setZone] = useState(1); const [lastDir, setLastDir] = useState<Dir | null>(null);
@@ -82,14 +84,14 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
         {missing && <p className="note small" role="status">{missing}</p>}
         {err && <p className="alert" role="alert">{err}</p>}
         {!loading && !err && data.length > 0 && data.length < MIN_CANDLES && <p className="alert" role="status">Only {data.length} candles on {tf.toUpperCase()} for this market (needs {MIN_CANDLES} to scan). Try a lower timeframe.</p>}
-        <Chart candles={data} analysis={analysis} setup={setup} zone={zone} theme={theme} viewKey={`${ex}|${sym}|${tf}`} oi={showOi ? oi ?? null : null} live={liveC} />
+        <Chart candles={data} analysis={analysis} setup={setup} zone={zone} yourLiq={(() => { const z = setup?.zones[zone]; if (!setup || !z || ex === "binance") return null; const c = checkLiq(z, setup.dir, lev, mmrFor(ex, market?.maxLev), market?.maxLev); return c.beforeStop ? c.liq : null; })()} theme={theme} viewKey={`${ex}|${sym}|${tf}`} oi={showOi ? oi ?? null : null} live={liveC} />
       </div>
       <div className="card controls"><StrategySelect value={stratId} onChange={onPickStrategy} current={settings} zone={zone} /></div>
       <div className="scanrow">
         <button className="btn long" disabled={!analysis || !!busy} onClick={() => run("long")}>{busy === "long" ? "Scanning…" : "Scan long"}</button>
         <button className="btn short" disabled={!analysis || !!busy} onClick={() => run("short")}>{busy === "short" ? "Scanning…" : "Scan short"}</button>
       </div>
-      {setup && <Result analysis={analysis} book={book} ex={ex} setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks })} onAlert={() => { const z = setup.zones[zone]; addAlert({ exchange: ex, symbol: sym, kind: "zone", lo: z.bottom, hi: z.top, label: `${setup.dir} Zone ${z.rank} entry ${fmt(z.bottom)}–${fmt(z.top)}` }); }} threshold={settings.threshold} />}
+      {setup && <Result lev={lev} setLev={setLev} mmr={ex === "binance" ? null : mmrFor(ex, market?.maxLev)} maxLev={market?.maxLev} analysis={analysis} book={book} ex={ex} setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks, ...(ex === "binance" ? {} : { leverage: lev, liq: checkLiq(setup.zones[zone], setup.dir, lev, mmrFor(ex, market?.maxLev)).liq }) })} onAlert={() => { const z = setup.zones[zone]; addAlert({ exchange: ex, symbol: sym, kind: "zone", lo: z.bottom, hi: z.top, label: `${setup.dir} Zone ${z.rank} entry ${fmt(z.bottom)}–${fmt(z.top)}` }); }} threshold={settings.threshold} />}
       {setup && Object.keys(cmp).length > 0 && <Compare cmp={cmp} current={ex} zone={zone} onPick={(e) => setEx(e)} dir={setup.dir} />}
       <AlertsCard />
       <div className="card">
@@ -105,7 +107,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
   );
 }
 
-function Result({ analysis, book, ex, setup, zone, setZone, onJournal, onAlert, threshold }: { analysis?: Analysis | null; book: Book | null; ex: Exchange; setup: Setup; zone: number; setZone: (n: number) => void; onJournal: () => void; onAlert: () => void; threshold: number }) {
+function Result({ lev, setLev, mmr, maxLev, analysis, book, ex, setup, zone, setZone, onJournal, onAlert, threshold }: { lev: number; setLev: (n: number) => void; mmr: number | null; maxLev?: number; analysis?: Analysis | null; book: Book | null; ex: Exchange; setup: Setup; zone: number; setZone: (n: number) => void; onJournal: () => void; onAlert: () => void; threshold: number }) {
   const [alerted, setAlerted] = useState<number | null>(null);
   const s = setup;
   return (
@@ -118,23 +120,28 @@ function Result({ analysis, book, ex, setup, zone, setZone, onJournal, onAlert, 
       <div className="meter" aria-hidden><div style={{ width: `${s.confidence}%` }} />{threshold > 0 && <i style={{ left: `${threshold}%` }} />}</div>
       {s.shown ? <p className="dim small">Setup rule met. Zones below.</p> : <p className="alert">No setup: {s.reason}. Zones are shown for reference only.</p>}
       <ul className="signals">{s.signals.map((g) => <li key={g.key} className={g.pass ? "pass" : "fail"}><span aria-label={g.pass ? "passed" : "failed"}>{g.pass ? "✓" : "✕"}</span><b>{g.name}</b><span className="dim">{g.detail}</span></li>)}</ul>
+      {mmr != null ? <div className="row gap wrap levrow"><label className="lbl" htmlFor="lev">Your leverage</label>
+        <input id="lev" className="input mono" type="number" inputMode="numeric" min={1} max={maxLev ?? 100} step={1} value={lev} style={{ width: 72 }} onChange={(e) => { const v = Math.round(+e.target.value); if (v >= 1) setLev(Math.min(v, maxLev ?? 100)); }} />
+        <span className="dim small">× · for the liquidation check below (est., isolated margin, maintenance {(mmr * 100).toFixed(2)}%)</span></div>
+        : <p className="dim small">Spot market: no leverage, no liquidation.</p>}
       <div className="zones" role="tablist" aria-label="Entry zones">
         {s.zones.map((z, i) => (
           <button key={i} role="tab" aria-selected={zone === i} className={`zone ${zone === i ? "on" : ""}`} onClick={() => setZone(i)}>
             <div className="row between"><span className="lbl">Zone {z.rank} · {z.name}</span>{z.ready ? <span className="badge long">In zone</span> : <span className="badge">Wait</span>}</div>
             <dl className="zkv">
-              {([["Entry", `${fmt(z.bottom)} – ${fmt(z.top)}`, ""], ["Median", fmt(z.entry), ""], ["Stop", fmt(z.stop), "neg"], ["TP1", fmt(z.t1), "pos"], ["TP2", fmt(z.t2), "pos"], ["R:R TP1 / TP2", `${z.rr1.toFixed(1)}R / ${z.rr2.toFixed(1)}R`, ""]] as const).map(([k, v, c]) => <div className="zr" key={k}><dt>{k}</dt><dd className={c}>{v}</dd></div>)}
+              {([["Entry", `${fmt(z.bottom)} – ${fmt(z.top)}`, ""], ["Median", fmt(z.entry), ""], ["Stop", fmt(z.stop), "neg"], ["TP1", fmt(z.t1), "pos"], ["TP2", fmt(z.t2), "pos"], ["R:R TP1 / TP2", `${z.rr1.toFixed(1)}R / ${z.rr2.toFixed(1)}R`, ""], ...(mmr != null ? [[`Your liq (${lev}×)`, fmt(checkLiq(z, s.dir, lev, mmr).liq), checkLiq(z, s.dir, lev, mmr).beforeStop ? "neg" : ""]] : [])] as const).map(([k, v, c]) => <div className="zr" key={k}><dt>{k}</dt><dd className={c}>{v}</dd></div>)}
             </dl>
+            {mmr != null && (() => { const c = checkLiq(z, s.dir, lev, mmr, maxLev); return c.beforeStop ? <span className="alert small" role="alert">Liquidated before stop at {lev}×. Use max {c.maxSafe}× or lower.</span> : null; })()}
             {z.pastStop ? <span className="alert small">Price is already past the stop: this zone is invalid for now.</span> : z.pastTp1 ? <span className="alert small">Price already beyond TP1. Wait for a retrace into the entry zone.</span> : null}
             <span className="dim small zcost">Costs {fmt(z.costs.total)} (spread {fmt(z.costs.spread)} + fees {fmt(z.costs.fees)}{z.costs.slip ? ` + slip ${fmt(z.costs.slip)}` : ""})</span>
             <span className="dim small zcost">Stop widened from {fmt(z.rawStop)}</span>
             <span className="dim small">{z.source}{z.note ? ` · ${z.note}` : ""}</span>
-            {(() => { const L = setup.dir === "long"; const lq = analysis?.liq.filter((b) => (L ? b.long : b.short) > 0 && b.price >= z.bottom && b.price <= z.top) ?? []; return lq.length ? <span className="dim small">Est. liq cluster ({L ? "longs" : "shorts"}) inside this entry zone at {lq.map((b) => fmt(b.price)).join(", ")}.</span> : null; })()}
+            {(() => { const L = setup.dir === "long"; const lq = analysis?.liq.filter((b) => (L ? b.long : b.short) > 0 && b.price >= z.bottom && b.price <= z.top) ?? []; return lq.length ? <span className="dim small">{L ? "Longs" : "Shorts"} liq zone (other traders) inside this entry zone at {lq.map((b) => fmt(b.price)).join(", ")}.</span> : null; })()}
           </button>
         ))}
       </div>
       <p className="mono small">{book ? <>Live spread {fmt(book.spread)} ({(book.spreadPct * 100).toFixed(4)}%) · bid {fmt(book.bid)} / ask {fmt(book.ask)}</> : "Spread unavailable (not included)"} · R:R is after spread, fees and slippage</p>
-      <p className="dim small">Heatmap levels (dotted, “est. liq”) are a model estimate from volume and assumed leverage, not real positions.</p>
+      <p className="dim small">Dotted grey “Shorts/Longs liq zone” lines are where <b>other traders</b> are estimated to get liquidated (a market level from volume and assumed leverage), not your position. Your own liquidation is in each zone card; a red “Your liq” line appears only if it comes before your stop.</p>
       <div className="row wrap gap"><button className="btn primary" onClick={onJournal}>Journal Zone {zone + 1}</button><button className="btn" onClick={() => { onAlert(); setAlerted(zone); }}>{alerted === zone ? "Alert set ✓" : `Alert when price enters Zone ${zone + 1}`}</button></div>
     </div>
   );

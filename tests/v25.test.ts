@@ -58,11 +58,28 @@ describe("chart axis labels (regression: est. liq covering Entry top/bottom, BTC
   });
   it("leaves labels alone when there's room", () => { const wide = declutter(lineSpecs(setup, 1, null, col), (p) => (90000 - p)); expect(wide.every((x) => x.label)).toBe(true); expect(wide[0].title).toBe("Entry top"); });
 });
+// @ts-ignore node builtin in tests
 import { readFileSync } from "node:fs";
 describe("zone card CSS (regression: Today's .kv override broke the zone grid)", () => {
   it("each class used by the zone card is defined once, as a row list", () => {
     const css = readFileSync("src/styles.css", "utf8");
     expect(css.match(/(^|[}\s])\.zkv\s*\{/g)).toHaveLength(1); expect(css).toMatch(/\.zkv \.zr\{display:flex;justify-content:space-between/);
     expect((css.match(/(^|[}\s])\.kv\s*\{/g) ?? []).length).toBeLessThanOrEqual(1);
+  });
+});
+import { checkLiq, liqPrice, maxSafeLev, mmrFor } from "../src/engine/liq";
+describe("your liquidation vs stop", () => {
+  it("liq price and max safe leverage", () => {
+    expect(mmrFor("hyperliquid", 40)).toBeCloseTo(0.0125); expect(mmrFor("binance")).toBe(0.005);
+    expect(liqPrice(100, "long", 10, 0.01)).toBeCloseTo(91); expect(liqPrice(100, "short", 10, 0.01)).toBeCloseTo(109);
+    // short at 85,000, stop 86,200 (1.41% away): 50× liquidates first; max safe ≈ floor(1/(0.0155+0.0125)) = 35
+    const c = checkLiq({ entry: 85000, stop: 86200 }, "short", 50, 0.0125, 40); expect(c.beforeStop).toBe(true); expect(c.maxSafe).toBe(35);
+    expect(checkLiq({ entry: 85000, stop: 86200 }, "short", c.maxSafe, 0.0125).beforeStop).toBe(false);
+    expect(checkLiq({ entry: 85000, stop: 86200 }, "short", 5, 0.0125).beforeStop).toBe(false); expect(maxSafeLev(100, 50, 0.01)).toBe(1);
+  });
+  it("draws 'Your liq' only when passed, and labels market liq as other traders' zones", () => {
+    const setup: any = { dir: "short", price: 84000, zones: [null, { top: 85448.8, bottom: 85326.2, stop: 86100, t1: 82300, t2: 81000 }] };
+    const sp = lineSpecs(setup, 1, { liq: [{ price: 85700, long: 0, short: 3 }] } as any, { accent: "a", neg: "n", pos: "p", warn: "w" }, 85900);
+    expect(sp.map((x) => x.title)).toEqual(expect.arrayContaining(["Your liq", "Shorts liq zone"])); expect(lineSpecs(setup, 1, null, { accent: "a", neg: "n", pos: "p", warn: "w" }).some((x) => x.title === "Your liq")).toBe(false);
   });
 });

@@ -13,14 +13,14 @@ describe("chart price lines (regression: stale est. liq lines)", () => {
     pl.sync(lineSpecs(L, 1, an, col)); const n1 = live.size; expect(n1).toBe(pl.count);
     pl.sync(lineSpecs(S, 1, an, col)); expect(live.size).toBe(pl.count);
     pl.sync(lineSpecs(S, 0, an, col)); pl.sync(lineSpecs(S, 2, an, col)); expect(live.size).toBe(pl.count);
-    expect([...live].filter((l: any) => l.title.startsWith("est. liq")).length).toBeLessThanOrEqual(3);
+    expect([...live].filter((l: any) => l.title.endsWith("liq zone")).length).toBeLessThanOrEqual(3);
     expect([...live].filter((l: any) => l.title === "TP1").length).toBe(1);
     pl.sync(lineSpecs(null, 1, an, col)); expect(live.size).toBe(0);
   });
   it("only the selected zone and the trade-side liq clusters are drawn", () => {
     const S = scan(c, "short", DEFAULTS); const sp = lineSpecs(S, 1, an, col);
     expect(sp.filter((x) => x.title === "Entry top")).toEqual([expect.objectContaining({ price: S.zones[1].top })]);
-    sp.filter((x) => x.title.startsWith("est. liq")).forEach((x) => expect(x.price).toBeGreaterThan(S.price));
+    sp.filter((x) => x.title.endsWith("liq zone")).forEach((x) => expect(x.price).toBeGreaterThan(S.price));
   });
   it("flags zones where price is already past TP1 / stop", () => {
     for (const d of ["long", "short"] as const) for (const z of scan(c, d, DEFAULTS).zones) {

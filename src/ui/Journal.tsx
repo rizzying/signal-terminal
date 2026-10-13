@@ -73,7 +73,7 @@ function TradeForm({ t, onSave, onCancel }: { t: Trade; onSave: (t: Trade) => vo
   const shot = async (file?: File) => { if (!file) return; if (file.size > 3e6) return alert("Screenshot is over 3 MB; please crop it."); const r = new FileReader(); r.onload = () => set({ screenshot: String(r.result) }); r.readAsDataURL(file); };
   return (
     <form className="card form rise" onSubmit={(e) => { e.preventDefault(); if (!f.symbol || !(f.entry > 0)) return alert("Symbol and entry are required."); onSave(f); }}>
-      <div className="cardhead"><h2>{t.source === "scan" ? "Journal scan" : "Trade"}</h2>{f.confidence != null && <span className="badge">P{f.confidence} · Zone {f.zone}</span>}</div>
+      <div className="cardhead"><h2>{t.source === "scan" ? "Journal scan" : "Trade"}</h2>{f.confidence != null && <span className="badge">P{f.confidence} · Zone {f.zone}</span>}{f.leverage != null && <span className="badge">{f.leverage}× · est. liq {fmt(f.liq ?? NaN)}</span>}</div>
       <div className="formgrid">
         <label>Symbol<input className="input" value={f.symbol} onChange={(e) => set({ symbol: e.target.value })} /></label>
         <label>Side<select className="input" value={f.side} onChange={(e) => set({ side: e.target.value as any })}><option value="long">Long</option><option value="short">Short</option></select></label>

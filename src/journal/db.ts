@@ -6,7 +6,7 @@ export type Trade = {
   id: string; createdAt: number; exchange: string; symbol: string; tf?: string; side: "long" | "short";
   entry: number; exit?: number; stop?: number; size: number; pnl?: number; r?: number;
   signals: string[]; confidence?: number; zone?: number; settings?: Settings; checklist?: Record<string, boolean>;
-  screenshot?: string; notes?: string; emotion?: Emotion; followedPlan?: boolean; source: "manual" | "scan" | "hyperliquid" | "bulk" | "binance-csv"; extId?: string;
+  screenshot?: string; notes?: string; leverage?: number; liq?: number; emotion?: Emotion; followedPlan?: boolean; source: "manual" | "scan" | "hyperliquid" | "bulk" | "binance-csv"; extId?: string;
 };
 export type Preset = { name: string; settings: Settings };
 export type ChecklistItem = { id: string; text: string };
