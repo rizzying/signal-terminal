@@ -3,7 +3,7 @@ import { chromium } from "playwright-core";
 const base = process.env.URL || "http://localhost:4173";
 const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome" });
 for (const w of [390, 1280]) {
-  const p = await b.newPage({ viewport: { width: w, height: 900 } }); const errs = []; p.on("console", (m) => m.type() === "error" && errs.push(m.text())); p.on("pageerror", (e) => errs.push(e.message));
+  const p = await b.newPage({ viewport: { width: w, height: 900 } }); await p.addInitScript(() => localStorage.setItem("sig.labs", JSON.stringify({ backtest: true }))); const errs = []; p.on("console", (m) => m.type() === "error" && errs.push(m.text())); p.on("pageerror", (e) => errs.push(e.message));
   await p.goto(base + "/#backtest"); await p.waitForTimeout(2500);
   const setBox = async (label, on) => { const c = p.locator("label.check input").nth(label.startsWith("Check") ? 0 : 1); if ((await c.isChecked()) !== on) await c.click(); };
   await setBox("Check on unseen data", true);

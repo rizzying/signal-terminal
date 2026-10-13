@@ -1,13 +1,18 @@
 import { useState } from "react";
 import { DEFAULTS, PARAMS, SIGNAL_NAMES, sanitize, type Settings, type SignalKey } from "../engine/settings";
 import { createStrategy, deleteStrategy, sameSettings, saveStrategy, type Strategy } from "../strategies";
+import { useLabs, setLabs } from "../labs";
 import { StrategySelect, useStrategyList } from "./StrategyPicker";
 
 export function SettingsView({ settings, setSettings, stratId, onPickStrategy }: { settings: Settings; setSettings: (s: Settings) => void; stratId: string; onPickStrategy: (s: Strategy) => void }) {
   const upd = (k: keyof Settings, v: unknown) => setSettings(sanitize({ ...settings, [k]: v }));
-  const groups = [...new Set(PARAMS.map((p) => p.group))];
+  const groups = [...new Set(PARAMS.map((p) => p.group))]; const labs = useLabs();
   return (
     <section className="stack rise">
+      <div className="card" data-labs>
+        <div className="cardhead"><h2>Labs</h2><span className="lbl">experimental · saved on this device</span></div>
+        <label className="param"><span>Backtest (experimental)<small className="dim"> · adds a Backtest tab under More. Past results, not a promise.</small></span><input type="checkbox" aria-label="Backtest (experimental)" checked={labs.backtest} onChange={(e) => setLabs({ ...labs, backtest: e.target.checked })} /></label>
+      </div>
       <StrategiesCard settings={settings} stratId={stratId} onPick={onPickStrategy} setSettings={setSettings} />
       {groups.map((g) => (
         <div className="card" key={g}><div className="cardhead"><h2>{g}</h2></div>

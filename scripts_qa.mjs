@@ -6,7 +6,7 @@ const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome", args
 const sizes = [320, 390, 768, 1024, 1440]; const report = [];
 for (const theme of ["dark", "light"]) for (const w of sizes) {
   const ctx = await b.newContext({ viewport: { width: w, height: w < 768 ? 844 : 900 }, deviceScaleFactor: 1 });
-  await ctx.addInitScript((t) => { localStorage.setItem("sig.theme", t); localStorage.setItem("sig.wallets", JSON.stringify([{ ex: "hyperliquid", address: "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303", name: "HLP vault" }])); }, theme);
+  await ctx.addInitScript((t) => { localStorage.setItem("sig.theme", t); localStorage.setItem("sig.wallets", JSON.stringify([{ ex: "hyperliquid", address: "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303", name: "HLP vault" }])); localStorage.setItem("sig.labs", JSON.stringify({ backtest: true })); }, theme);
   const p = await ctx.newPage(); const errs = [];
   p.on("console", (m) => m.type() === "error" && errs.push(m.text())); p.on("pageerror", (e) => errs.push(e.message));
   for (const tab of ["scan", "market", "watch", "backtest", "calendar", "wallets", "journal", "settings"]) {

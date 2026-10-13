@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { allStrategies, sameSettings, type Strategy } from "../strategies";
 import type { Settings } from "../engine/settings";
 import { TESTED } from "../tested";
+import { useLabs } from "../labs";
 
 export function TestedNote({ id, zone }: { id: string; zone: number }) {
-  const t = TESTED[id]?.[zone + 1]; if (!t) return null; const o = t.oos;
+  const labs = useLabs(); const t = TESTED[id]?.[zone + 1]; if (!t) return null; const o = t.oos;
+  if (!labs.backtest) return <p className="dim small tested" data-tested>No proven edge in our tests. Use the zones as levels to watch, not as automatic trades.</p>;
   return <p className="dim small tested" data-tested><span className="badge">tested</span> Zone {zone + 1}, out-of-sample (BTC/ETH/SOL · 1h/4H/1D): {o.n} trades, {o.win.toFixed(0)}% wins, {o.exp >= 0 ? "+" : ""}{o.exp.toFixed(2)}R per trade after fees, max drawdown {o.dd.toFixed(0)}R. In-sample it was {t.is.exp >= 0 ? "+" : ""}{t.is.exp.toFixed(2)}R. <b>No reliable edge found</b>; use the zones as a level map. <a href="https://github.com/rizzying/signal-terminal/blob/main/docs/BACKTEST.md" target="_blank" rel="noopener noreferrer">Details</a></p>;
 }
 
