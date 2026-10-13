@@ -75,7 +75,7 @@ export default function App() {
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}
         </Suspense></>}
       </main>
-      <footer className="foot dim small">Signal v2.5 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v2.6 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }

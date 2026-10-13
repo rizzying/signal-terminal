@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { candles, marketsCached, roundTick, type Exchange, type TF } from "../api/markets";
 import { fmt, MIN_CANDLES, roundSetup, scan, type Setup } from "../engine/scan";
+import { mmrFor } from "../engine/liq";
 import type { Settings } from "../engine/settings";
 import { loadAlerts, type Alert } from "../alerts";
 import { loadSnap } from "./Watchlist";
@@ -23,7 +24,7 @@ export function TodayView({ settings, go }: { settings: Settings; go: (tab: "sca
   useEffect(() => { let live = true; (async () => {
     try { const [c, ms] = await Promise.all([candles(ex, sym, tf, 400), marketsCached(ex).catch(() => [])]); if (c.length < MIN_CANDLES) { live && setBest("short"); return; }
       const tick = ms.find((m) => m.symbol === sym)?.tick; const r = (s: Setup) => (tick ? roundSetup(s, (p, m) => roundTick(p, tick, m)) : s);
-      const L = scan(c, "long", settings), S = scan(c, "short", settings); const pick = L.shown !== S.shown ? (L.shown ? L : S) : L.confidence >= S.confidence ? L : S; live && setBest(r(pick)); }
+      const mk = ms.find((m) => m.symbol === sym); const o = { maxLev: mk?.maxLev, mmr: mmrFor(ex, mk?.maxLev) }; const L = scan(c, "long", settings, o), S = scan(c, "short", settings, o); const pick = L.shown !== S.shown ? (L.shown ? L : S) : L.confidence >= S.confidence ? L : S; live && setBest(r(pick)); }
     catch { live && setBest("err"); } })(); return () => { live = false; }; }, [ex, sym, tf, settings]);
   const wex = (localStorage.getItem("sig.watch.lastEx") as Exchange) || ex; const snap = loadSnap(wex);
   const top = snap?.rows.filter((r) => r.shown).slice(0, 3) ?? [];

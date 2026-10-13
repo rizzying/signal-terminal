@@ -87,5 +87,5 @@ describe("breakout with volume", () => {
     const z = base(81, 0); const sk = breakoutSignal(z, { pivots: pivots(z, 3) }, "long", DEFAULTS); expect(sk.weight).toBe(0); expect(sk.detail).toMatch(/Skipped/);
     expect(breakoutSignal(c, an, "long", sanitize({ useBreakout: false })).weight).toBe(0);
   });
-  it("is one of 8 signals and counts toward the others", () => { const s = scan(mk(wave(300, 0.2)), "long", DEFAULTS); expect(s.signals).toHaveLength(8); expect(s.signals.at(-1)!.key).toBe("breakout"); });
+  it("is one of the signals and counts toward the others", () => { const s = scan(mk(wave(300, 0.2)), "long", DEFAULTS); expect(s.signals).toHaveLength(9); expect(s.signals.at(-2)!.key).toBe("breakout"); expect(s.signals.at(-1)!.key).toBe("liqmagnet"); });
 });

@@ -46,13 +46,13 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
   const [showOi, setShowOi] = useState(() => localStorage.getItem("sig.oi") !== "0"); const [oi, setOi] = useState<OIPoint[] | null | undefined>(undefined); // undefined = loading, null = not available
   useEffect(() => { localStorage.setItem("sig.oi", showOi ? "1" : "0"); if (!showOi) { setOi(null); return; } let live = true; setOi(undefined); oiHistory(baseAsset(sym), tf, 400).then((x) => live && setOi(x)).catch(() => live && setOi(null)); return () => { live = false; }; }, [sym, tf, showOi]);
   const market = markets.find((m) => m.symbol === sym);
-  const analysis = useMemo(() => (data.length >= MIN_CANDLES ? analyze(data, settings, market?.maxLev) : null), [data, settings, market]);
+  const analysis = useMemo(() => (data.length >= MIN_CANDLES ? analyze(data, settings, market?.maxLev, mmrFor(ex, market?.maxLev)) : null), [data, settings, market, ex]);
   const filtered = useMemo(() => { const s = q.trim().toLowerCase(); return (s ? markets.filter((m) => m.label.toLowerCase().includes(s) || m.symbol.toLowerCase().includes(s)) : markets).slice(0, 60); }, [q, markets]);
   async function run(dir: Dir, auto = false) {
     setBusy(dir); setErr(null);
     try {
       const h = HTF[tf]; const [htf, bk] = await Promise.all([settings.useHtf && h ? loadCandles(ex, sym, h as TF, 200).catch(() => null) : null, topOfBook(ex, sym).catch(() => null)]);
-      const st = scan(data, dir, settings, { maxLev: market?.maxLev, htf, htfTf: h, costs: bk ? { spread: bk.spread, feePct: feeFor(ex, settings) } : { spread: 0, feePct: feeFor(ex, settings) } });
+      const st = scan(data, dir, settings, { maxLev: market?.maxLev, mmr: mmrFor(ex, market?.maxLev), htf, htfTf: h, costs: bk ? { spread: bk.spread, feePct: feeFor(ex, settings) } : { spread: 0, feePct: feeFor(ex, settings) } });
       setSetup(market?.tick ? roundSetup(st, (p, m) => roundTick(p, market.tick, m)) : st); setBook(bk); setLastDir(dir); ranFor.current = [data, settings]; if (!auto) { setZone(1); setTicks({}); }
       const key = `${baseAsset(sym)}|${tf}|${dir}`; const row = { symbol: sym, label: market?.label ?? sym, setup: st, book: bk, at: Date.now() };
       setCmp((p) => (cmpFor.current === key ? { ...p, [ex]: row } : { [ex]: row })); cmpFor.current = key;
@@ -141,7 +141,7 @@ function Result({ lev, setLev, mmr, maxLev, analysis, book, ex, setup, zone, set
         ))}
       </div>
       <p className="mono small">{book ? <>Live spread {fmt(book.spread)} ({(book.spreadPct * 100).toFixed(4)}%) · bid {fmt(book.bid)} / ask {fmt(book.ask)}</> : "Spread unavailable (not included)"} · R:R is after spread, fees and slippage</p>
-      <p className="dim small">Dotted grey “Shorts/Longs liq zone” lines are where <b>other traders</b> are estimated to get liquidated (a market level from volume and assumed leverage), not your position. Your own liquidation is in each zone card; a red “Your liq” line appears only if it comes before your stop.</p>
+      <p className="dim small">Dotted grey “Shorts/Longs liq zone” lines are where <b>other traders</b> are estimated to get liquidated, from this exchange’s volume, max leverage and margin rules. They are market levels and can become “Liq zone” entries. They are not your position. Your own liquidation is in each zone card; a red “Your liq” line appears only if it comes before your stop.</p>
       <div className="row wrap gap"><button className="btn primary" onClick={onJournal}>Journal Zone {zone + 1}</button><button className="btn" onClick={() => { onAlert(); setAlerted(zone); }}>{alerted === zone ? "Alert set ✓" : `Alert when price enters Zone ${zone + 1}`}</button></div>
     </div>
   );

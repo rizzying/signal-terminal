@@ -5,7 +5,7 @@ import { DEFAULTS, type Settings, type SignalKey, SIGNAL_NAMES } from "./setting
 export type Dir = "long" | "short";
 export type Pivot = { i: number; price: number; kind: "high" | "low"; label?: "HH" | "HL" | "LH" | "LL" };
 export type Break = { i: number; dir: "bull" | "bear"; level: number; choch: boolean };
-export type Box = { top: number; bottom: number; i: number; kind: "OB" | "FVG" | "Breaker" | "Swing"; dir: "bull" | "bear"; retests?: number };
+export type Box = { top: number; bottom: number; i: number; kind: "OB" | "FVG" | "Breaker" | "Swing" | "Liq zone"; dir: "bull" | "bear"; retests?: number; liq?: number };
 export type Signal = { key: SignalKey; name: string; pass: boolean; weight: number; detail: string };
 export type Costs = { spread: number; fees: number; slip: number; total: number };
 export type Zone = { pastTp1: boolean; pastStop: boolean; costs: Costs; rawStop: number; rank: 1 | 2 | 3; name: "Aggressive" | "Balanced" | "Deep"; top: number; bottom: number; entry: number; stop: number; t1: number; t2: number; rr1: number; rr2: number; source: string; ready: boolean; note?: string };
@@ -72,7 +72,7 @@ export function breakers(c: Candle[], obs: Box[], maxRetests = 1): Box[] {
   }
   return out;
 }
-export function analyze(c: Candle[], s: Settings = DEFAULTS, maxLev = 20): Analysis {
+export function analyze(c: Candle[], s: Settings = DEFAULTS, maxLev = 20, mmr?: number): Analysis {
   const a = atr(c, s.atrLen); const A = a[a.length - 1] || (c.at(-1)!.h - c.at(-1)!.l) || 1;
   const piv = pivots(c, s.swingLen); const br = structureBreaks(c, piv, s.swingLen);
   const minI = c.length - s.obMaxAgeBars;
@@ -83,7 +83,7 @@ export function analyze(c: Candle[], s: Settings = DEFAULTS, maxLev = 20): Analy
   return {
     pivots: piv, breaks: br, obs: s.obMustBreak ? obs : allObs, fvgs: fvgs(c, s.fvgMinAtr * A).filter((f) => f.i >= minI),
     breakers: breakers(c, allObs, s.breakerMaxRetests), rsi: rsi(closes, s.rsiLen), emaF: ema(closes, s.emaFast), emaS: ema(closes, s.emaSlow), atr: A,
-    liq: s.heatmapWeight > 0 && last > 20 ? estimateLiqMap(c, { maxLev }).bins : [],
+    liq: s.heatmapWeight > 0 && last > 20 ? estimateLiqMap(c, { maxLev, mmr }).bins : [],
   };
 }
 function rsiDivergence(c: Candle[], piv: Pivot[], r: number[], dir: Dir, look: number): boolean {
@@ -117,7 +117,7 @@ export function signalsFor(c: Candle[], an: Analysis, dir: Dir, s: Settings): Si
   const rsiS = sig("rsi", rOk, `RSI ${r.toFixed(1)}${div ? `, ${bull ? "bullish" : "bearish"} divergence` : ""}`);
   const ef = an.emaF.at(-1)!, es = an.emaS.at(-1)!;
   const emaS = Number.isFinite(es) ? sig("ema", bull ? ef > es : ef < es, `EMA${s.emaFast} ${ef > es ? ">" : "<"} EMA${s.emaSlow}`) : { ...sig("ema", false, `Not enough history for EMA${s.emaSlow} (skipped)`), weight: 0 };
-  return [structure, fvgob, swings, breaker, inducement, rsiS, emaS, breakoutSignal(c, an, dir, s)];
+  return [structure, fvgob, swings, breaker, inducement, rsiS, emaS, breakoutSignal(c, an, dir, s), liqMagnetSignal(c, an, dir, s)];
 }
 /** Breakout with volume: a close through the last confirmed swing high (low for shorts) within the last N bars, on ≥ X× average volume. */
 export function breakoutSignal(c: Candle[], an: Pick<Analysis, "pivots">, dir: Dir, s: Settings): Signal {
@@ -134,6 +134,25 @@ export function breakoutSignal(c: Candle[], an: Pick<Analysis, "pivots">, dir: D
     if (x >= s.boMult) { best = txt; break; } near ??= `${txt} (needs ${s.boMult}×)`;
   }
   return { key: "breakout", name, pass: !!best, weight: w, detail: best ?? near ?? `No close ${bull ? "above the last swing high" : "below the last swing low"} in the last ${s.boLookback} bars` };
+}
+/** Heavy estimated liquidation clusters on the trade side: short liqs above price (short entries), long liqs below (long entries).
+ *  "Heavy" = at least half the biggest bin on that side; touching bins are merged into one cluster. */
+export function heavyClusters(an: Pick<Analysis, "liq" | "atr">, dir: Dir, px: number): { lo: number; hi: number; p: number; v: number }[] {
+  const L = dir === "long"; const side = an.liq.map((b) => ({ p: b.price, v: L ? b.long : b.short })).filter((b) => b.v > 0 && (L ? b.p < px : b.p > px)).sort((a, b) => a.p - b.p);
+  if (!side.length) return []; const max = Math.max(...side.map((b) => b.v)); const step = side.length > 1 ? Math.min(...side.slice(1).map((b, i) => b.p - side[i].p)) : an.atr * 0.2;
+  const out: { lo: number; hi: number; p: number; v: number }[] = [];
+  for (const b of side.filter((b) => b.v >= 0.5 * max)) { const last = out.at(-1);
+    if (last && b.p - last.hi <= step * 1.5) { last.hi = b.p; if (b.v > last.v) { last.v = b.v; last.p = b.p; } } else out.push({ lo: b.p, hi: b.p, p: b.p, v: b.v }); }
+  return out;
+}
+/** Liq magnet: a heavy cluster sits inside one of the entry zones or within 0.5 ATR of it (price tends to get pulled there). */
+export function liqMagnetSignal(c: Candle[], an: Analysis, dir: Dir, s: Settings): Signal {
+  const name = SIGNAL_NAMES.liqmagnet; const w = s.weights.liqmagnet ?? 1;
+  if (!s.useLiqMagnet) return { key: "liqmagnet", name, pass: false, weight: 0, detail: "Off in Settings" };
+  if (!an.liq.length) return { key: "liqmagnet", name, pass: false, weight: 0, detail: "Skipped: heatmap off or no volume on this market" };
+  const px = c.at(-1)!.c; const cl = heavyClusters(an, dir, px); const zs = buildZones(c, an, dir, s);
+  const hit = zs.filter((z) => cl.some((k) => k.hi >= z.bottom - 0.5 * an.atr && k.lo <= z.top + 0.5 * an.atr));
+  return { key: "liqmagnet", name, pass: hit.length > 0, weight: w, detail: hit.length ? `Heavy est. ${dir === "long" ? "long" : "short"} liq cluster in/near Zone ${hit.map((z) => z.rank).join(", ")}` : cl.length ? `Nearest heavy cluster ${fmt(cl.sort((a, b) => Math.abs(a.p - px) - Math.abs(b.p - px))[0].p)} isn't near a zone` : `No heavy ${dir === "long" ? "long" : "short"} liq cluster ${dir === "long" ? "below" : "above"} price` };
 }
 export const confidence = (sigs: Signal[]) => { const t = sigs.reduce((a, x) => a + x.weight, 0); return t ? Math.round((100 * sigs.reduce((a, x) => a + (x.pass ? x.weight : 0), 0)) / t) : 0; };
 
@@ -161,6 +180,13 @@ export function buildZones(c: Candle[], an: Analysis, dir: Dir, s: Settings, ci?
     .map<Box>((p) => ({ top: bull ? p.price + 0.15 * A : p.price, bottom: bull ? p.price : p.price - 0.15 * A, i: p.i, kind: "Swing", dir: d }));
   const dist = (z: Box) => (bull ? px - z.top : z.bottom - px);
   cands = cands.map((z) => (bull ? { ...z, top: Math.min(z.top, px) } : { ...z, bottom: Math.max(z.bottom, px) }));
+  // Heavy est. liq clusters on the trade side: snap/extend a nearby structure zone to include them, otherwise they become their own "Liq zone"
+  if (s.heatmapWeight > 0) for (const k of heavyClusters(an, dir, px)) {
+    const box = { lo: k.lo - 0.1 * A, hi: k.hi + 0.1 * A }; const near = (z: Box) => box.lo <= z.top + 0.3 * A && z.bottom <= box.hi + 0.3 * A;
+    const all = [...cands, ...swings]; const j = all.findIndex(near);
+    if (j >= 0) { const z = all[j]; z.top = Math.max(z.top, bull ? Math.min(box.hi, px) : box.hi); z.bottom = Math.min(z.bottom, bull ? box.lo : Math.max(box.lo, px)); z.liq = k.p; }
+    else cands.push({ top: bull ? Math.min(box.hi, px) : box.hi, bottom: bull ? box.lo : Math.max(box.lo, px), i: c.length - 1, kind: "Liq zone", dir: d, liq: k.p });
+  }
   const pick: Box[] = [];
   const overlaps = (a: Box, b: Box) => a.bottom <= b.top + 0.1 * A && b.bottom <= a.top + 0.1 * A;
   for (const z of [...cands].sort((a, b) => dist(a) - dist(b))) if (!pick.some((p) => overlaps(p, z))) pick.push(z);
@@ -188,7 +214,8 @@ export function buildZones(c: Candle[], an: Analysis, dir: Dir, s: Settings, ci?
     // TP1 is a fixed R multiple (what the backtest study tested); TP2 = next structure beyond it
     const t1 = bull ? entry + need : entry - need;
     const t2 = opp.filter((p) => (bull ? p > t1 : p < t1)).sort((a, b) => (bull ? a - b : b - a)).find((t) => Math.abs(t - entry) > Math.abs(t1 - entry) * 1.3) ?? (bull ? entry + Math.abs(t1 - entry) * 1.6 : entry - Math.abs(t1 - entry) * 1.6);
-    const src = z.retests === -1 ? "ATR step (no structure)" : z.kind === "Swing" ? `Swing ${bull ? "low" : "high"}` : `${d === "bull" ? "Bullish" : "Bearish"} ${z.kind}`;
+    const src0 = z.retests === -1 ? "ATR step (no structure)" : z.kind === "Liq zone" ? `Liq zone (est. ${bull ? "long" : "short"} liquidations ~${fmt(z.liq!)})` : z.kind === "Swing" ? `Swing ${bull ? "low" : "high"}` : `${d === "bull" ? "Bullish" : "Bearish"} ${z.kind}`;
+    const src = z.liq != null && z.kind !== "Liq zone" ? `${src0} + Liq zone` : src0;
     return { pastTp1: bull ? px >= t1 : px <= t1, pastStop: bull ? px <= stop : px >= stop, costs, rawStop, rank: (k + 1) as 1 | 2 | 3, name: names[k], top: z.top, bottom: z.bottom, entry, stop, t1, t2, rr1: (Math.abs(t1 - entry) - costs.total) / R, rr2: (Math.abs(t2 - entry) - costs.total) / R, source: src, ready: px <= z.top + 1e-9 && px >= z.bottom - 1e-9, note: nudge.note };
   });
 }
@@ -199,9 +226,9 @@ export function htfAgree(htf: Candle[] | null, dir: Dir, s: Settings, tf: string
   const ok = b.dir === (dir === "long" ? "bull" : "bear");
   return { tf, agrees: ok, detail: `${tf} last ${b.choch ? "ChoCH" : "BoS"} is ${b.dir === "bull" ? "up" : "down"}` };
 }
-export function scan(c: Candle[], dir: Dir, s: Settings, opts: { maxLev?: number; htf?: Candle[] | null; htfTf?: string; costs?: CostInput } = {}): Setup {
+export function scan(c: Candle[], dir: Dir, s: Settings, opts: { maxLev?: number; mmr?: number; htf?: Candle[] | null; htfTf?: string; costs?: CostInput } = {}): Setup {
   if (c.length < MIN_CANDLES) throw new Error(`This market only has ${c.length} candles on this timeframe; Signal needs at least ${MIN_CANDLES}. Try a lower timeframe.`);
-  const an = analyze(c, s, opts.maxLev);
+  const an = analyze(c, s, opts.maxLev, opts.mmr);
   const signals = signalsFor(c, an, dir, s); const conf = confidence(signals);
   const structureOk = signals.find((x) => x.key === "structure")!.pass; const others = signals.filter((x) => x.key !== "structure" && x.weight > 0);
   const othersAgree = others.filter((x) => x.pass).length; const minO = Math.min(s.minOthers, others.length);

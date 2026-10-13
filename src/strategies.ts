@@ -2,7 +2,7 @@
 import { DEFAULTS, sanitize, type Settings } from "./engine/settings";
 import { db } from "./journal/db";
 export type Strategy = { id: string; name: string; builtin?: boolean; settings: Settings; updatedAt?: number };
-const w = (o: Partial<Settings["weights"]>) => ({ structure: 0, fvgob: 0, swings: 0, breaker: 0, inducement: 0, rsi: 0, ema: 0, breakout: 0, ...o });
+const w = (o: Partial<Settings["weights"]>) => ({ structure: 0, fvgob: 0, swings: 0, breaker: 0, inducement: 0, rsi: 0, ema: 0, breakout: 0, liqmagnet: 0, ...o });
 export const BUILTINS: Strategy[] = [
   { id: "b-default", name: "Signal default", builtin: true, settings: sanitize(DEFAULTS) },
   { id: "b-ema-rsi", name: "Double EMA 21/50 + RSI", builtin: true, settings: sanitize({ emaFast: 21, emaSlow: 50, weights: w({ ema: 2, rsi: 1, structure: 0.5 }), gateStructure: false, minOthers: 2 }) },
