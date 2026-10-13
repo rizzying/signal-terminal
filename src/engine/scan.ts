@@ -8,7 +8,7 @@ export type Break = { i: number; dir: "bull" | "bear"; level: number; choch: boo
 export type Box = { top: number; bottom: number; i: number; kind: "OB" | "FVG" | "Breaker" | "Swing"; dir: "bull" | "bear"; retests?: number };
 export type Signal = { key: SignalKey; name: string; pass: boolean; weight: number; detail: string };
 export type Costs = { spread: number; fees: number; slip: number; total: number };
-export type Zone = { costs: Costs; rawStop: number; rank: 1 | 2 | 3; name: "Aggressive" | "Balanced" | "Deep"; top: number; bottom: number; entry: number; stop: number; t1: number; t2: number; rr1: number; rr2: number; source: string; ready: boolean; note?: string };
+export type Zone = { pastTp1: boolean; pastStop: boolean; costs: Costs; rawStop: number; rank: 1 | 2 | 3; name: "Aggressive" | "Balanced" | "Deep"; top: number; bottom: number; entry: number; stop: number; t1: number; t2: number; rr1: number; rr2: number; source: string; ready: boolean; note?: string };
 export type Setup = { dir: Dir; confidence: number; band: "Low" | "Medium" | "High"; othersAgree: number; othersTotal: number; structureOk: boolean; reason: string; shown: boolean; signals: Signal[]; zones: Zone[]; htf?: { tf: string; agrees: boolean | null; detail: string }; price: number; atr: number };
 export type Analysis = { pivots: Pivot[]; breaks: Break[]; obs: Box[]; fvgs: Box[]; breakers: Box[]; rsi: number[]; emaF: number[]; emaS: number[]; atr: number; liq: { price: number; long: number; short: number }[] };
 
@@ -189,7 +189,7 @@ export function buildZones(c: Candle[], an: Analysis, dir: Dir, s: Settings, ci?
     const t1 = tgts[0] ?? (bull ? entry + need : entry - need);
     const t2 = tgts.find((t) => Math.abs(t - entry) > Math.abs(t1 - entry) * 1.3) ?? (bull ? entry + Math.abs(t1 - entry) * 1.6 : entry - Math.abs(t1 - entry) * 1.6);
     const src = z.retests === -1 ? "ATR step (no structure)" : z.kind === "Swing" ? `Swing ${bull ? "low" : "high"}` : `${d === "bull" ? "Bullish" : "Bearish"} ${z.kind}`;
-    return { costs, rawStop, rank: (k + 1) as 1 | 2 | 3, name: names[k], top: z.top, bottom: z.bottom, entry, stop, t1, t2, rr1: (Math.abs(t1 - entry) - costs.total) / R, rr2: (Math.abs(t2 - entry) - costs.total) / R, source: src, ready: px <= z.top + 1e-9 && px >= z.bottom - 1e-9, note: nudge.note };
+    return { pastTp1: bull ? px >= t1 : px <= t1, pastStop: bull ? px <= stop : px >= stop, costs, rawStop, rank: (k + 1) as 1 | 2 | 3, name: names[k], top: z.top, bottom: z.bottom, entry, stop, t1, t2, rr1: (Math.abs(t1 - entry) - costs.total) / R, rr2: (Math.abs(t2 - entry) - costs.total) / R, source: src, ready: px <= z.top + 1e-9 && px >= z.bottom - 1e-9, note: nudge.note };
   });
 }
 export function htfAgree(htf: Candle[] | null, dir: Dir, s: Settings, tf: string): Setup["htf"] {

@@ -44,7 +44,7 @@ export default function App() {
           <button className={`more-btn ${TABS.some((t) => t.more && t.id === tab) ? "on" : ""}`} aria-expanded={more} aria-haspopup="menu" onClick={() => setMore(!more)}>More</button>
           {more && <div className="more-menu" role="menu">{TABS.filter((t) => t.more).map((t) => <button key={t.id} role="menuitem" className={tab === t.id ? "on" : ""} onClick={() => { setTab(t.id); setMore(false); }}>{t.name}</button>)}</div>}
         </nav>
-        <button className="btn ghost sm" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>{theme === "dark" ? "Light" : "Dark"}</button>
+        <button className="btn ghost sm" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={() => { const t = theme === "dark" ? "light" : "dark"; document.documentElement.classList.toggle("dark", t === "dark"); setTheme(t); }}>{theme === "dark" ? "Light" : "Dark"}</button>
       </header>
       <main>
         {tab === "scan" && <ScanView settings={settings} theme={theme} onJournal={journal} />}
@@ -54,7 +54,7 @@ export default function App() {
         {tab === "journal" && <JournalView prefill={prefill} clearPrefill={() => setPrefill(null)} />}
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} />}
       </main>
-      <footer className="foot dim small">Signal v1.6 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v1.6.1 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }

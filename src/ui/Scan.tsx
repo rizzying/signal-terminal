@@ -104,7 +104,7 @@ function Result({ book, ex, setup, zone, setZone, onJournal, onAlert, threshold 
   return (
     <div className={`card result ${s.dir} rise`}>
       <div className="cardhead">
-        <div className="row gap"><span className={`badge ${s.dir}`}>{s.dir.toUpperCase()}</span><span className="hero">{s.band}</span><span className="mono dim">{s.confidence}% · structure {s.structureOk ? "✓" : "✕"} + {s.othersAgree}/{s.othersTotal}</span>
+        <div className="row wrap gap"><span className={`badge ${s.dir}`}>{s.dir.toUpperCase()}</span><span className="hero">{s.band}</span><span className="mono dim">{s.confidence}% · structure {s.structureOk ? "✓" : "✕"} + {s.othersAgree}/{s.othersTotal}</span>
           <span className="info" tabIndex={0} title="Share of signals on this timeframe that agree with this direction. Higher timeframes never change it. It is NOT the probability the trade wins: our backtests found agreement wasn't predictive.">ⓘ signals agreeing, not win chance</span></div>
       </div>
       {s.htf && <p className="dim small htfnote">HTF bias (context only, never scored or blocking): {s.htf.detail}{s.htf.agrees == null ? "" : s.htf.agrees ? " (same direction)" : " (opposite direction)"}.</p>}
@@ -122,6 +122,7 @@ function Result({ book, ex, setup, zone, setZone, onJournal, onAlert, threshold 
               <span>TP1 / TP2</span><b className="pos">{fmt(z.t1)} / {fmt(z.t2)}</b>
               <span>R:R</span><b>{z.rr1.toFixed(1)}R / {z.rr2.toFixed(1)}R</b>
             </div>
+            {z.pastStop ? <span className="alert small">Price is already past the stop: this zone is invalid for now.</span> : z.pastTp1 ? <span className="alert small">Price already beyond TP1. Wait for a retrace into the entry zone.</span> : null}
             <span className="dim small costs">Costs {fmt(z.costs.total)} = spread {fmt(z.costs.spread)} + fees {fmt(z.costs.fees)}{z.costs.slip ? ` + slippage ${fmt(z.costs.slip)}` : ""}. Stop widened from {fmt(z.rawStop)}.</span>
             <span className="dim small">{z.source}{z.note ? ` · ${z.note}` : ""}</span>
           </button>

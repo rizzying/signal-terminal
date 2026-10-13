@@ -1,0 +1,18 @@
+import { chromium } from "playwright-core";
+const url = process.env.URL || "http://localhost:4173";
+const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome", args: ["--no-sandbox"] });
+const ctx = await b.newContext({ viewport: { width: 1024, height: 900 } }); await ctx.addInitScript(() => localStorage.setItem("sig.theme", "light"));
+const p = await ctx.newPage(); const errs = []; p.on("console", (m) => m.type() === "error" && errs.push(m.text()));
+const st = () => p.evaluate(() => { const c = document.querySelector(".chart"); return { lines: c.dataset.lines, grid: c.dataset.grid, dark: document.documentElement.classList.contains("dark") }; });
+await p.goto(url + "/#scan"); await p.waitForTimeout(3500); const out = {};
+await p.getByRole("tab", { name: "1D" }).click(); await p.waitForTimeout(2500);
+await p.getByRole("button", { name: "Scan long" }).click(); await p.waitForTimeout(2500); out.long = await st();
+await p.getByRole("button", { name: "Scan short" }).click(); await p.waitForTimeout(2500); out.short = await st();
+await p.getByRole("tab", { name: /Zone 1/ }).click(); await p.waitForTimeout(300); out.zone1 = await st();
+await p.getByRole("tab", { name: "4H" }).click(); await p.waitForTimeout(4000); out.tf4h = await st();
+await p.getByRole("button", { name: /Switch to dark/ }).click(); await p.waitForTimeout(500); out.dark = await st();
+await p.getByRole("button", { name: /Switch to light/ }).click(); await p.waitForTimeout(500); out.light = await st();
+await p.getByRole("button", { name: /Switch to dark/ }).click(); await p.waitForTimeout(500);
+await p.goto(url + "/#market"); await p.waitForTimeout(800); await p.goto(url + "/#scan"); await p.waitForTimeout(3000); out.remountDark = await st();
+out.flags = await p.evaluate(() => [...document.querySelectorAll(".zone .alert")].map((e) => e.textContent));
+console.log(JSON.stringify({ ...out, errs }, null, 0)); await b.close();
