@@ -1,4 +1,6 @@
 import { useLiveCandle } from "./useLiveCandle";
+import { NumField } from "./NumField";
+import { setLev, useLev } from "../leverage";
 import { checkLiq, mmrFor } from "../engine/liq";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { candles as loadCandles, feeFor, marketsCached, roundTick, tfsFor, topOfBook, type Book, type Exchange, type Market, type TF } from "../api/markets";
@@ -23,7 +25,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
   const [sym, setSym] = useState<string>(() => localStorage.getItem("sig.sym") || DEF_SYM[ex]);
   const [tf, setTf] = useState<TF>(() => (localStorage.getItem("sig.tf") as TF) || "4h");
   const [missing, setMissing] = useState<string | null>(null);
-  const [lev, setLev] = useState(settings.leverage ?? 5); useEffect(() => setLev(settings.leverage ?? 5), [settings.leverage]);
+  const levRaw = useLev(stratId, settings.leverage ?? 5); const setLevS = (v: number) => setLev(stratId, v);
   const [markets, setMarkets] = useState<Market[]>([]); const [marketsFor, setMarketsFor] = useState<Exchange | null>(null); const [q, setQ] = useState(""); const [open, setOpen] = useState(false);
   const [data, setData] = useState<Candle[]>([]); const [err, setErr] = useState<string | null>(null); const [loading, setLoading] = useState(false);
   const [setup, setSetup] = useState<Setup | null>(null); const [zone, setZone] = useState(1); const [lastDir, setLastDir] = useState<Dir | null>(null);
@@ -46,6 +48,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
   const [showOi, setShowOi] = useState(() => localStorage.getItem("sig.oi") !== "0"); const [oi, setOi] = useState<OIPoint[] | null | undefined>(undefined); // undefined = loading, null = not available
   useEffect(() => { localStorage.setItem("sig.oi", showOi ? "1" : "0"); if (!showOi) { setOi(null); return; } let live = true; setOi(undefined); oiHistory(baseAsset(sym), tf, 400).then((x) => live && setOi(x)).catch(() => live && setOi(null)); return () => { live = false; }; }, [sym, tf, showOi]);
   const market = markets.find((m) => m.symbol === sym);
+  const lev = Math.min(levRaw, market?.maxLev ?? 100); // capped to this market's max
   const analysis = useMemo(() => (data.length >= MIN_CANDLES ? analyze(data, settings, market?.maxLev, mmrFor(ex, market?.maxLev)) : null), [data, settings, market, ex]);
   const filtered = useMemo(() => { const s = q.trim().toLowerCase(); return (s ? markets.filter((m) => m.label.toLowerCase().includes(s) || m.symbol.toLowerCase().includes(s)) : markets).slice(0, 60); }, [q, markets]);
   async function run(dir: Dir, auto = false) {
@@ -91,7 +94,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
         <button className="btn long" disabled={!analysis || !!busy} onClick={() => run("long")}>{busy === "long" ? "Scanning…" : "Scan long"}</button>
         <button className="btn short" disabled={!analysis || !!busy} onClick={() => run("short")}>{busy === "short" ? "Scanning…" : "Scan short"}</button>
       </div>
-      {setup && <Result lev={lev} setLev={setLev} mmr={ex === "binance" ? null : mmrFor(ex, market?.maxLev)} maxLev={market?.maxLev} analysis={analysis} book={book} ex={ex} setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks, ...(ex === "binance" ? {} : { leverage: lev, liq: checkLiq(setup.zones[zone], setup.dir, lev, mmrFor(ex, market?.maxLev)).liq }) })} onAlert={() => { const z = setup.zones[zone]; addAlert({ exchange: ex, symbol: sym, kind: "zone", lo: z.bottom, hi: z.top, label: `${setup.dir} Zone ${z.rank} entry ${fmt(z.bottom)}–${fmt(z.top)}` }); }} threshold={settings.threshold} />}
+      {setup && <Result lev={lev} setLev={setLevS} mmr={ex === "binance" ? null : mmrFor(ex, market?.maxLev)} maxLev={market?.maxLev} analysis={analysis} book={book} ex={ex} setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks, ...(ex === "binance" ? {} : { leverage: lev, liq: checkLiq(setup.zones[zone], setup.dir, lev, mmrFor(ex, market?.maxLev)).liq }) })} onAlert={() => { const z = setup.zones[zone]; addAlert({ exchange: ex, symbol: sym, kind: "zone", lo: z.bottom, hi: z.top, label: `${setup.dir} Zone ${z.rank} entry ${fmt(z.bottom)}–${fmt(z.top)}` }); }} threshold={settings.threshold} />}
       {setup && Object.keys(cmp).length > 0 && <Compare cmp={cmp} current={ex} zone={zone} onPick={(e) => setEx(e)} dir={setup.dir} />}
       <AlertsCard />
       <div className="card">
@@ -121,7 +124,7 @@ function Result({ lev, setLev, mmr, maxLev, analysis, book, ex, setup, zone, set
       {s.shown ? <p className="dim small">Setup rule met. Zones below.</p> : <p className="alert">No setup: {s.reason}. Zones are shown for reference only.</p>}
       <ul className="signals">{s.signals.map((g) => <li key={g.key} className={g.pass ? "pass" : "fail"}><span aria-label={g.pass ? "passed" : "failed"}>{g.pass ? "✓" : "✕"}</span><b>{g.name}</b><span className="dim">{g.detail}</span></li>)}</ul>
       {mmr != null ? <div className="row gap wrap levrow"><label className="lbl" htmlFor="lev">Your leverage</label>
-        <input id="lev" className="input mono" type="number" inputMode="numeric" min={1} max={maxLev ?? 100} step={1} value={lev} style={{ width: 72 }} onChange={(e) => { const v = Math.round(+e.target.value); if (v >= 1) setLev(Math.min(v, maxLev ?? 100)); }} />
+        <NumField id="lev" label="Your leverage" min={1} max={maxLev ?? 100} step={1} steppers value={lev} onCommit={setLev} />
         <span className="dim small">× · for the liquidation check below (est., isolated margin, maintenance {(mmr * 100).toFixed(2)}%)</span></div>
         : <p className="dim small">Spot market: no leverage, no liquidation.</p>}
       <div className="zones" role="tablist" aria-label="Entry zones">

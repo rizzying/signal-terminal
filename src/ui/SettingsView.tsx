@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { NumField } from "./NumField";
+import { setLev, useLev } from "../leverage";
 import { DEFAULTS, PARAMS, SIGNAL_NAMES, sanitize, type Settings, type SignalKey } from "../engine/settings";
 import { createStrategy, deleteStrategy, sameSettings, saveStrategy, type Strategy } from "../strategies";
 import { useLabs, setLabs } from "../labs";
 import { StrategySelect, useStrategyList } from "./StrategyPicker";
 
 export function SettingsView({ settings, setSettings, stratId, onPickStrategy }: { settings: Settings; setSettings: (s: Settings) => void; stratId: string; onPickStrategy: (s: Strategy) => void }) {
+  const lev = useLev(stratId, settings.leverage ?? 5);
   const upd = (k: keyof Settings, v: unknown) => setSettings(sanitize({ ...settings, [k]: v }));
   const groups = [...new Set(PARAMS.map((p) => p.group))]; const labs = useLabs();
   return (
@@ -19,8 +22,8 @@ export function SettingsView({ settings, setSettings, stratId, onPickStrategy }:
           <div className="params">{PARAMS.filter((p) => p.group === g).map((p) => {
             const v = settings[p.key] as number; const d = DEFAULTS[p.key] as number;
             return <label key={p.key} className="param"><span>{p.label}{p.help && <small className="dim"> · {p.help}</small>}</span>
-              <span className="row gap"><input className="input num" type="number" min={p.min} max={p.max} step={p.step} value={v} onChange={(e) => upd(p.key, e.target.value === "" ? d : +e.target.value)} />
-                <button type="button" className="btn ghost sm" disabled={v === d} onClick={() => upd(p.key, d)} aria-label={`Reset ${p.label} to ${d}`}>↺ {d}</button></span></label>;
+              <span className="row gap">{p.key === "leverage" ? <NumField label={p.label} min={p.min} max={p.max} step={1} steppers value={lev} onCommit={(x) => setLev(stratId, x)} /> : <NumField label={p.label} min={p.min} max={p.max} step={p.step} value={v} onCommit={(x) => upd(p.key, x)} />}
+                <button type="button" className="btn ghost sm" disabled={(p.key === "leverage" ? lev : v) === d} onClick={() => (p.key === "leverage" ? setLev(stratId, d) : upd(p.key, d))} aria-label={`Reset ${p.label} to ${d}`}>↺ {d}</button></span></label>;
           })}
           {g === "Confidence" && <>
             <label className="param"><span>Show higher-timeframe context note<small className="dim"> · never affects confidence</small></span><input type="checkbox" checked={settings.useHtf} onChange={(e) => upd("useHtf", e.target.checked)} /></label>
@@ -31,7 +34,7 @@ export function SettingsView({ settings, setSettings, stratId, onPickStrategy }:
             <label className="param"><span>Enter only after a candle closes inside the zone<small className="dim"> · off = first touch</small></span><input type="checkbox" checked={settings.entryOnClose} onChange={(e) => upd("entryOnClose", e.target.checked)} /></label>
             <label className="param"><span>Exit (backtest)</span><select className="input" value={settings.exitMode} onChange={(e) => upd("exitMode", +e.target.value as 0 | 1 | 2)}><option value={0}>All at TP1</option><option value={1}>Half at 2R, rest at 3R</option><option value={2}>Half at 2R, rest to break-even</option></select></label>
             {(Object.keys(SIGNAL_NAMES) as SignalKey[]).map((k) => <label key={k} className="param"><span>Weight: {SIGNAL_NAMES[k]}<small className="dim"> · 0 = off</small></span>
-              <input className="input num" type="number" min={0} max={3} step={0.5} value={settings.weights[k]} onChange={(e) => setSettings(sanitize({ ...settings, weights: { ...settings.weights, [k]: Math.max(0, Math.min(3, +e.target.value || 0)) } }))} /></label>)}
+              <NumField label={`Weight ${SIGNAL_NAMES[k]}`} min={0} max={3} step={0.5} value={settings.weights[k]} onCommit={(x) => setSettings(sanitize({ ...settings, weights: { ...settings.weights, [k]: x } }))} /></label>)}
           </>}
           </div></div>
       ))}
