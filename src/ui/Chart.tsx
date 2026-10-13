@@ -7,7 +7,7 @@ import { lineSpecs, PriceLines } from "./chartLines";
 
 let cv: CanvasRenderingContext2D | null = null;
 /** Resolve a CSS custom property (may be color-mix()) to an rgba() string the chart library can parse. */
-const css = (v: string) => {
+export const css = (v: string) => {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#888";
   cv ??= Object.assign(document.createElement("canvas"), { width: 1, height: 1 }).getContext("2d", { willReadFrequently: true });
   if (!cv) return "#888";

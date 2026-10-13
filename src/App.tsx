@@ -8,10 +8,11 @@ import { useAlertWatcher } from "./ui/Alerts";
 import { Watchlist } from "./ui/Watchlist";
 import { Wallets } from "./ui/Wallets";
 import { MarketView } from "./ui/Market";
+import { BacktestView } from "./ui/Backtest";
 import { activeId, setActiveId, type Strategy } from "./strategies";
 
 type Tab = "scan" | "market" | "watch" | "backtest" | "calendar" | "wallets" | "journal" | "settings";
-const TABS: { id: Tab; name: string; more?: boolean }[] = [{ id: "scan", name: "Scan" }, { id: "market", name: "Market" }, { id: "watch", name: "Watchlist" }, { id: "wallets", name: "Wallets", more: true }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings", more: true }];
+const TABS: { id: Tab; name: string; more?: boolean }[] = [{ id: "scan", name: "Scan" }, { id: "market", name: "Market" }, { id: "watch", name: "Watchlist" }, { id: "backtest", name: "Backtest", more: true }, { id: "wallets", name: "Wallets", more: true }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings", more: true }];
 export default function App() {
   useAlertWatcher();
   const [more, setMore] = useState(false);
@@ -54,11 +55,12 @@ export default function App() {
         {tab === "scan" && <ScanView stratId={stratId} onPickStrategy={pickStrategy} settings={settings} theme={theme} onJournal={journal} />}
         {tab === "watch" && <Watchlist settings={settings} onOpen={(ex, sym, tf) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); setTab("scan"); }} />}
         {tab === "market" && <MarketView />}
+        {tab === "backtest" && <BacktestView settings={settings} stratId={stratId} theme={theme} />}
         {tab === "wallets" && <Wallets />}
         {tab === "journal" && <JournalView prefill={prefill} clearPrefill={() => setPrefill(null)} />}
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}
       </main>
-      <footer className="foot dim small">Signal v1.7 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v2.0 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }
