@@ -2,9 +2,12 @@ import { TokenBucket } from "./limiter";
 import type { Candle } from "../engine/indicators";
 
 export type Exchange = "hyperliquid" | "bulk" | "binance";
-export type TF = "15m" | "4h" | "1d" | "1w";
-export const TFS: TF[] = ["15m", "4h", "1d", "1w"];
-export const TF_MS: Record<TF, number> = { "15m": 9e5, "4h": 1.44e7, "1d": 8.64e7, "1w": 6.048e8 };
+export type TF = "1m" | "5m" | "15m" | "1h" | "4h" | "12h" | "1d" | "3d" | "1w";
+export const TFS: TF[] = ["1m", "5m", "15m", "1h", "4h", "12h", "1d", "3d", "1w"];
+export const TF_MS: Record<TF, number> = { "1m": 6e4, "5m": 3e5, "15m": 9e5, "1h": 3.6e6, "4h": 1.44e7, "12h": 4.32e7, "1d": 8.64e7, "3d": 2.592e8, "1w": 6.048e8 };
+/** Intervals each exchange's public candle API serves (all verified live Oct 2026). Unsupported ones are hidden in the UI. */
+export const EX_TFS: Record<"hyperliquid" | "bulk" | "binance", TF[]> = { hyperliquid: TFS, bulk: TFS, binance: TFS };
+export const tfsFor = (ex: "hyperliquid" | "bulk" | "binance") => EX_TFS[ex];
 export type Market = { symbol: string; label: string; maxLev: number };
 
 type F = typeof fetch;
@@ -79,3 +82,9 @@ export async function topOfBook(ex: Exchange, symbol: string, f?: F): Promise<Bo
   const spread = ask - bid; return { bid, ask, spread, spreadPct: spread / ((ask + bid) / 2) };
 }
 export const feeFor = (ex: Exchange, s: { feeHyperliquid: number; feeBulk: number; feeBinance: number }) => (ex === "hyperliquid" ? s.feeHyperliquid : ex === "bulk" ? s.feeBulk : s.feeBinance);
+
+/** Hyperliquid candles between two times (HL only serves the most recent ~5000 candles per interval). */
+export async function hlRange(symbol: string, tf: TF, start: number, end: number, f?: F): Promise<Candle[]> {
+  const r = await hl({ type: "candleSnapshot", req: { coin: symbol, interval: tf, startTime: start, endTime: end } }, f);
+  return r.map((k: any) => ({ t: k.t, o: +k.o, h: +k.h, l: +k.l, c: +k.c, v: +k.v }));
+}

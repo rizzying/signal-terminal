@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { candles, TFS, type Exchange, type TF } from "../api/markets";
+import { candles, tfsFor, type Exchange, type TF } from "../api/markets";
 import { fmt, scan, type Setup } from "../engine/scan";
 import type { Settings } from "../engine/settings";
 
@@ -35,7 +35,7 @@ export function Watchlist({ settings, onOpen }: { settings: Settings; onOpen: (e
         <div className="cardhead"><h2>Watchlist scanner</h2><span className="lbl">up to 20 symbols</span></div>
         <div className="row wrap gap" style={{ marginBottom: 12 }}>
           <div className="seg" role="tablist" aria-label="Exchange">{(["hyperliquid", "bulk", "binance"] as Exchange[]).map((e) => <button key={e} role="tab" aria-selected={ex === e} className={ex === e ? "on" : ""} onClick={() => switchEx(e)}>{e === "hyperliquid" ? "Hyperliquid" : e === "bulk" ? "Bulk" : "Binance"}</button>)}</div>
-          <div className="seg" role="tablist" aria-label="Timeframe">{TFS.map((t) => <button key={t} role="tab" aria-selected={tf === t} className={tf === t ? "on" : ""} onClick={() => setTf(t)}>{t.toUpperCase()}</button>)}</div>
+          <div className="seg" role="tablist" aria-label="Timeframe">{tfsFor(ex).map((t) => <button key={t} role="tab" aria-selected={tf === t} className={tf === t ? "on" : ""} onClick={() => setTf(t)}>{t.toUpperCase()}</button>)}</div>
         </div>
         <label className="lbl" htmlFor="wl">Symbols (comma separated, exchange format)</label>
         <textarea id="wl" className="input" style={{ width: "100%", marginTop: 4 }} rows={2} value={list} onChange={(e) => setList(e.target.value)} />

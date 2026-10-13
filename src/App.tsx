@@ -8,8 +8,9 @@ import { useAlertWatcher } from "./ui/Alerts";
 import { Watchlist } from "./ui/Watchlist";
 import { Wallets } from "./ui/Wallets";
 import { MarketView } from "./ui/Market";
+import { activeId, setActiveId, type Strategy } from "./strategies";
 
-type Tab = "scan" | "market" | "watch" | "wallets" | "journal" | "settings";
+type Tab = "scan" | "market" | "watch" | "backtest" | "calendar" | "wallets" | "journal" | "settings";
 const TABS: { id: Tab; name: string; more?: boolean }[] = [{ id: "scan", name: "Scan" }, { id: "market", name: "Market" }, { id: "watch", name: "Watchlist" }, { id: "wallets", name: "Wallets", more: true }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings", more: true }];
 export default function App() {
   useAlertWatcher();
@@ -27,6 +28,9 @@ export default function App() {
     if (s) setSettingsS(sanitize(s));
   })(); }, []);
   const setSettings = (s: Settings) => { setSettingsS(s); db.set("settings", s); };
+  const [stratId, setStratId] = useState("b-default");
+  useEffect(() => { activeId().then(setStratId); }, []);
+  const pickStrategy = (s: Strategy) => { setSettings(s.settings); setStratId(s.id); setActiveId(s.id); };
   useEffect(() => { document.documentElement.classList.toggle("dark", theme === "dark"); document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#08080a" : "#ffffff"); localStorage.setItem("sig.theme", theme); }, [theme]);
   useEffect(() => { const f = () => { const h = location.hash.slice(1) as Tab; if (TABS.some((t) => t.id === h)) setTab(h); }; addEventListener("hashchange", f); return () => removeEventListener("hashchange", f); }, []);
   useEffect(() => { history.replaceState(null, "", `#${tab}`); window.scrollTo(0, 0); }, [tab]);
@@ -47,14 +51,14 @@ export default function App() {
         <button className="btn ghost sm" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={() => { const t = theme === "dark" ? "light" : "dark"; document.documentElement.classList.toggle("dark", t === "dark"); setTheme(t); }}>{theme === "dark" ? "Light" : "Dark"}</button>
       </header>
       <main>
-        {tab === "scan" && <ScanView settings={settings} theme={theme} onJournal={journal} />}
+        {tab === "scan" && <ScanView stratId={stratId} onPickStrategy={pickStrategy} settings={settings} theme={theme} onJournal={journal} />}
         {tab === "watch" && <Watchlist settings={settings} onOpen={(ex, sym, tf) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); setTab("scan"); }} />}
         {tab === "market" && <MarketView />}
         {tab === "wallets" && <Wallets />}
         {tab === "journal" && <JournalView prefill={prefill} clearPrefill={() => setPrefill(null)} />}
-        {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} />}
+        {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}
       </main>
-      <footer className="foot dim small">Signal v1.6.1 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v1.7 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }

@@ -4,7 +4,7 @@ type Colors = { accent: string; neg: string; pos: string; warn: string };
 /** Every price line for the current view. Only the selected zone, plus up to 3 liquidation clusters on the side that matters for this trade. */
 export function lineSpecs(setup: Setup | null, zone: number, analysis: Analysis | null, col: Colors): LineSpec[] {
   const out: LineSpec[] = []; const z = setup?.zones[zone]; if (!setup || !z) return out;
-  out.push({ price: z.top, color: col.accent, title: "Entry top", style: 2 }, { price: z.entry, color: col.accent, title: "Entry median", style: 1 }, { price: z.bottom, color: col.accent, title: "Entry bottom", style: 2 },
+  out.push({ price: z.top, color: col.accent, title: "Entry top", style: 2 }, { price: z.bottom, color: col.accent, title: "Entry bottom", style: 2 },
     { price: z.stop, color: col.neg, title: "Stop", style: 0 }, { price: z.t1, color: col.pos, title: "TP1", style: 0 }, { price: z.t2, color: col.pos, title: "TP2", style: 1 });
   if (analysis?.liq.length) {
     const long = setup.dir === "long";

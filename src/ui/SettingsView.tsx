@@ -1,22 +1,14 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DEFAULTS, PARAMS, SIGNAL_NAMES, sanitize, type Settings, type SignalKey } from "../engine/settings";
-import { db, type Preset } from "../journal/db";
+import { createStrategy, deleteStrategy, sameSettings, saveStrategy, type Strategy } from "../strategies";
+import { StrategySelect, useStrategyList } from "./StrategyPicker";
 
-export function SettingsView({ settings, setSettings }: { settings: Settings; setSettings: (s: Settings) => void }) {
-  const [presets, setPresets] = useState<Preset[]>([]); const [name, setName] = useState("");
-  useEffect(() => { db.get<Preset[]>("presets").then((p) => setPresets(p ?? [])); }, []);
-  const savePresets = (p: Preset[]) => { setPresets(p); db.set("presets", p); };
+export function SettingsView({ settings, setSettings, stratId, onPickStrategy }: { settings: Settings; setSettings: (s: Settings) => void; stratId: string; onPickStrategy: (s: Strategy) => void }) {
   const upd = (k: keyof Settings, v: unknown) => setSettings(sanitize({ ...settings, [k]: v }));
   const groups = [...new Set(PARAMS.map((p) => p.group))];
   return (
     <section className="stack rise">
-      <div className="card">
-        <div className="cardhead"><h2>Presets</h2><button className="btn ghost sm" onClick={() => setSettings(sanitize(DEFAULTS))}>Reset all to defaults</button></div>
-        <ul className="presetlist">{presets.map((p) => <li key={p.name}><button className="btn" onClick={() => setSettings(sanitize(p.settings))}>Load {p.name}</button><button className="btn ghost sm" aria-label={`Delete preset ${p.name}`} onClick={() => savePresets(presets.filter((x) => x.name !== p.name))}>Delete</button></li>)}{!presets.length && <li className="dim small">No presets yet. Saved on this device only.</li>}</ul>
-        <form className="row" onSubmit={(e) => { e.preventDefault(); const n = name.trim(); if (!n) return; savePresets([...presets.filter((p) => p.name !== n), { name: n, settings }]); setName(""); }}>
-          <input className="input grow" aria-label="Preset name" placeholder="Preset name" value={name} onChange={(e) => setName(e.target.value)} /><button className="btn primary">Save current</button>
-        </form>
-      </div>
+      <StrategiesCard settings={settings} stratId={stratId} onPick={onPickStrategy} setSettings={setSettings} />
       {groups.map((g) => (
         <div className="card" key={g}><div className="cardhead"><h2>{g}</h2></div>
           <div className="params">{PARAMS.filter((p) => p.group === g).map((p) => {
@@ -36,5 +28,32 @@ export function SettingsView({ settings, setSettings }: { settings: Settings; se
           </div></div>
       ))}
     </section>
+  );
+}
+
+function StrategiesCard({ settings, stratId, onPick, setSettings }: { settings: Settings; stratId: string; onPick: (s: Strategy) => void; setSettings: (s: Settings) => void }) {
+  const list = useStrategyList(); const cur = list.find((s) => s.id === stratId); const dirty = !!cur && !sameSettings(cur.settings, settings);
+  const [name, setName] = useState(""); const [renaming, setRenaming] = useState(false); const [msg, setMsg] = useState<string | null>(null);
+  const done = (m: string) => { setMsg(m); setTimeout(() => setMsg(null), 2500); };
+  return (
+    <div className="card">
+      <div className="cardhead"><h2>Strategies</h2><span className="lbl">saved on this device</span></div>
+      <p className="dim small">A strategy is the full rule set below: signals on/off, weights, minimum count, risk, spread and fees. Pick one to load it; edits below change the loaded copy until you save.</p>
+      <div className="row wrap gap"><StrategySelect value={stratId} onChange={onPick} current={settings} label="Loaded" />
+        {dirty && <span className="badge">unsaved changes</span>}</div>
+      <div className="row wrap gap" style={{ marginTop: 12 }}>
+        {cur && !cur.builtin && <button className="btn primary" disabled={!dirty} onClick={async () => { await saveStrategy({ ...cur, settings }); done(`Saved “${cur.name}”.`); }}>Save changes</button>}
+        {cur && dirty && <button className="btn ghost" onClick={() => setSettings(cur.settings)}>Discard changes</button>}
+        {cur && <button className="btn" onClick={async () => { const n = await createStrategy(`${cur.name} copy`, settings); onPick(n); done(`Created “${n.name}”.`); }}>Duplicate</button>}
+        {cur && !cur.builtin && <button className="btn" onClick={() => { setName(cur.name); setRenaming(true); }}>Rename</button>}
+        {cur && !cur.builtin && <button className="btn ghost" onClick={async () => { if (!confirm(`Delete “${cur.name}” from this device?`)) return; await deleteStrategy(cur.id); onPick(list[0]); done("Deleted."); }}>Delete</button>}
+      </div>
+      {renaming && cur && <form className="row gap" style={{ marginTop: 12 }} onSubmit={async (e) => { e.preventDefault(); await saveStrategy({ ...cur, name: name.trim() || cur.name }); setRenaming(false); done("Renamed."); }}><input className="input grow" aria-label="Strategy name" value={name} onChange={(e) => setName(e.target.value)} /><button className="btn primary">Save name</button></form>}
+      <form className="row gap" style={{ marginTop: 12 }} onSubmit={async (e) => { e.preventDefault(); const n = await createStrategy(name.trim() || "My strategy", settings); setName(""); onPick(n); done(`Created “${n.name}”.`); }}>
+        <input className="input grow" aria-label="New strategy name" placeholder="New strategy name" value={renaming ? "" : name} onChange={(e) => setName(e.target.value)} /><button className="btn">Save as new</button>
+      </form>
+      {msg && <p className="note" role="status">{msg}</p>}
+      <button className="btn ghost sm" style={{ marginTop: 8 }} onClick={() => setSettings(sanitize(DEFAULTS))}>Reset all fields to defaults</button>
+    </div>
   );
 }

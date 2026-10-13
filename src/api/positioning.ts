@@ -3,7 +3,7 @@ import type { TF } from "./markets";
 type F = typeof fetch;
 const j = async (f: F, url: string) => { const r = await f(url); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); };
 const GATE = "https://api.gateio.ws/api/v4/futures/usdt";
-const GATE_IV: Record<TF, string> = { "15m": "15m", "4h": "4h", "1d": "1d", "1w": "1d" };
+const GATE_IV: Record<TF, string> = { "1m": "5m", "5m": "5m", "15m": "15m", "1h": "1h", "4h": "4h", "12h": "4h", "1d": "1d", "3d": "1d", "1w": "1d" };
 
 export type OIPoint = { t: number; oiUsd: number; lsAccount: number; longLiqUsd: number; shortLiqUsd: number };
 /** Gate.io USDT-perp contract stats (CORS-enabled). Used as a market-wide proxy for OI and long/short. */

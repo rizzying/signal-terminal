@@ -3,7 +3,7 @@
   "theme": "dark",
   "w": 320,
   "tab": "scan",
-  "overflow": 20,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -13,9 +13,7 @@
   "tab": "market",
   "overflow": 0,
   "axe": [],
-  "errs": [
-   "Failed to load resource: the server responded with a status of 503 ()"
-  ]
+  "errs": []
  },
  {
   "theme": "dark",
@@ -63,9 +61,7 @@
   "tab": "market",
   "overflow": 0,
   "axe": [],
-  "errs": [
-   "Failed to load resource: the server responded with a status of 503 ()"
-  ]
+  "errs": []
  },
  {
   "theme": "dark",
@@ -113,9 +109,7 @@
   "tab": "market",
   "overflow": 0,
   "axe": [],
-  "errs": [
-   "Failed to load resource: the server responded with a status of 503 ()"
-  ]
+  "errs": []
  },
  {
   "theme": "dark",
@@ -163,9 +157,7 @@
   "tab": "market",
   "overflow": 0,
   "axe": [],
-  "errs": [
-   "Failed to load resource: the server responded with a status of 503 ()"
-  ]
+  "errs": []
  },
  {
   "theme": "dark",
@@ -213,22 +205,12 @@
   "tab": "market",
   "overflow": 0,
   "axe": [],
-  "errs": [
-   "Failed to load resource: the server responded with a status of 503 ()"
-  ]
- },
- {
-  "theme": "dark",
-  "w": 1440,
-  "tab": "watch",
-  "overflow": 0,
-  "axe": [],
   "errs": []
  },
  {
   "theme": "dark",
   "w": 1440,
-  "tab": "wallets",
+  "tab": "watch",
   "overflow": 0,
   "axe": [],
   "errs": []
@@ -236,6 +218,14 @@
  {
   "theme": "dark",
   "w": 1440,
+  "tab": "wallets",
+  "overflow": 0,
+  "axe": [],
+  "errs": []
+ },
+ {
+  "theme": "dark",
+  "w": 1440,
   "tab": "journal",
   "overflow": 0,
   "axe": [],
@@ -253,7 +243,7 @@
   "theme": "light",
   "w": 320,
   "tab": "scan",
-  "overflow": 20,
+  "overflow": 0,
   "axe": [],
   "errs": []
  },
@@ -263,9 +253,7 @@
   "tab": "market",
   "overflow": 0,
   "axe": [],
-  "errs": [
-   "Failed to load resource: the server responded with a status of 503 ()"
-  ]
+  "errs": []
  },
  {
   "theme": "light",
@@ -313,9 +301,7 @@
   "tab": "market",
   "overflow": 0,
   "axe": [],
-  "errs": [
-   "Failed to load resource: the server responded with a status of 503 ()"
-  ]
+  "errs": []
  },
  {
   "theme": "light",
@@ -363,9 +349,7 @@
   "tab": "market",
   "overflow": 0,
   "axe": [],
-  "errs": [
-   "Failed to load resource: the server responded with a status of 503 ()"
-  ]
+  "errs": []
  },
  {
   "theme": "light",
@@ -413,9 +397,7 @@
   "tab": "market",
   "overflow": 0,
   "axe": [],
-  "errs": [
-   "Failed to load resource: the server responded with a status of 503 ()"
-  ]
+  "errs": []
  },
  {
   "theme": "light",
@@ -463,9 +445,7 @@
   "tab": "market",
   "overflow": 0,
   "axe": [],
-  "errs": [
-   "Failed to load resource: the server responded with a status of 503 ()"
-  ]
+  "errs": []
  },
  {
   "theme": "light",

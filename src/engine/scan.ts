@@ -213,5 +213,5 @@ export function scan(c: Candle[], dir: Dir, s: Settings, opts: { maxLev?: number
 }
 export const confidenceBand = (c: number): "Low" | "Medium" | "High" => (c > 70 ? "High" : c >= 50 ? "Medium" : "Low");
 export const MIN_CANDLES = 30;
-export const HTF: Record<string, string | undefined> = { "15m": "4h", "4h": "1d", "1d": "1w", "1w": undefined };
+export const HTF: Record<string, string | undefined> = { "1m": "15m", "5m": "1h", "15m": "4h", "1h": "4h", "4h": "1d", "12h": "3d", "1d": "1w", "3d": "1w", "1w": undefined };
 export function fmt(n: number) { if (!Number.isFinite(n)) return "–"; const a = Math.abs(n); const d = a >= 1000 ? 1 : a >= 10 ? 2 : a >= 1 ? 4 : 6; return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: d }); }

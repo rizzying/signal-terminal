@@ -28,3 +28,7 @@ describe("chart price lines (regression: stale est. liq lines)", () => {
     }
   });
 });
+it("v2: no median line on the chart, only entry top/bottom, stop, TP1, TP2 (+ liq)", () => {
+  const c = mk(300); const S = scan(c, "short", DEFAULTS); const t = lineSpecs(S, 1, null, col).map((x) => x.title);
+  expect(t).toEqual(["Entry top", "Entry bottom", "Stop", "TP1", "TP2"]);
+});

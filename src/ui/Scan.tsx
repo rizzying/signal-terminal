@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { candles as loadCandles, feeFor, listMarkets, TFS, topOfBook, type Book, type Exchange, type Market, type TF } from "../api/markets";
+import { candles as loadCandles, feeFor, listMarkets, tfsFor, topOfBook, type Book, type Exchange, type Market, type TF } from "../api/markets";
 import type { Candle } from "../engine/indicators";
 import { analyze, fmt, HTF, MIN_CANDLES, scan, type Dir, type Setup } from "../engine/scan";
 import type { Settings } from "../engine/settings";
 import { db, type ChecklistItem } from "../journal/db";
 import { Chart } from "./Chart";
 import { AlertsCard, addAlert } from "./Alerts";
+import { StrategySelect } from "./StrategyPicker";
+import type { Strategy } from "../strategies";
 import { baseAsset } from "../api/funding";
 import { oiHistory, type OIPoint } from "../api/positioning";
 
@@ -14,7 +16,7 @@ const DEF_SYM: Record<Exchange, string> = { hyperliquid: "BTC", bulk: "BTC-USD",
 type Cmp = { symbol: string; label: string; setup: Setup; book: Book | null; at: number };
 export type Draft = { exchange: Exchange; symbol: string; tf: TF; setup: Setup; zone: number; checklist: Record<string, boolean> };
 
-export function ScanView({ settings, theme, onJournal }: { settings: Settings; theme: string; onJournal: (d: Draft) => void }) {
+export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }: { settings: Settings; theme: string; onJournal: (d: Draft) => void; stratId: string; onPickStrategy: (s: Strategy) => void }) {
   const [ex, setEx] = useState<Exchange>(() => (localStorage.getItem("sig.ex") as Exchange) || "hyperliquid");
   const [sym, setSym] = useState<string>(() => localStorage.getItem("sig.sym") || DEF_SYM[ex]);
   const [tf, setTf] = useState<TF>(() => (localStorage.getItem("sig.tf") as TF) || "4h");
@@ -70,7 +72,7 @@ export function ScanView({ settings, theme, onJournal }: { settings: Settings; t
           {open && <ul className="menu" role="listbox">{filtered.map((m) => <li key={m.symbol}><button role="option" aria-selected={m.symbol === sym} onMouseDown={(e) => e.preventDefault()} onClick={() => { setSym(m.symbol); setOpen(false); }}>{m.label}<span className="mono dim">{m.maxLev}x</span></button></li>)}{!filtered.length && <li className="dim pad">{markets.length ? "No match" : "Loading markets…"}</li>}</ul>}
           <span className="mono dim small">{markets.length} markets</span>
         </div>
-        <div className="seg" role="tablist" aria-label="Timeframe">{TFS.map((t) => <button key={t} role="tab" aria-selected={tf === t} className={tf === t ? "on" : ""} onClick={() => setTf(t)}>{t.toUpperCase()}</button>)}</div>
+        <div className="seg" role="tablist" aria-label="Timeframe">{tfsFor(ex).map((t) => <button key={t} role="tab" aria-selected={tf === t} className={tf === t ? "on" : ""} onClick={() => setTf(t)}>{t.toUpperCase()}</button>)}</div>
       </div>
       <div className="card chartcard">
         <div className="cardhead"><span className="lbl">{market?.label ?? sym} · {tf.toUpperCase()} · {EX.find((e) => e.id === ex)!.name}</span><span className="row gap"><button className={`chip ${showOi ? "on" : ""}`} aria-pressed={showOi} onClick={() => setShowOi(!showOi)}>OI line{showOi && oi === null ? " (n/a)" : ""}</button><span className="mono">{last ? fmt(last.c) : loading ? "Loading…" : "–"}</span></span></div>
@@ -78,6 +80,7 @@ export function ScanView({ settings, theme, onJournal }: { settings: Settings; t
         {!loading && !err && data.length > 0 && data.length < MIN_CANDLES && <p className="alert" role="status">Only {data.length} candles on {tf.toUpperCase()} for this market (needs {MIN_CANDLES} to scan). Try a lower timeframe.</p>}
         <Chart candles={data} analysis={analysis} setup={setup} zone={zone} theme={theme} viewKey={`${ex}|${sym}|${tf}`} oi={showOi ? oi : null} />
       </div>
+      <div className="card controls"><StrategySelect value={stratId} onChange={onPickStrategy} current={settings} /></div>
       <div className="scanrow">
         <button className="btn long" disabled={!analysis || !!busy} onClick={() => run("long")}>{busy === "long" ? "Scanning…" : "Scan long"}</button>
         <button className="btn short" disabled={!analysis || !!busy} onClick={() => run("short")}>{busy === "short" ? "Scanning…" : "Scan short"}</button>

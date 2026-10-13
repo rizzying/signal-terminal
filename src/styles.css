@@ -126,3 +126,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere}
   .nav button{padding:10px 11px}
 }
 @media (max-width:23rem){.nav button,.nav .more-btn{padding:10px 9px;font-size:13px}}
+.stratsel{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.stratsel select{min-width:14rem}
+.btform{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));margin-bottom:12px}.btform label,.btform>div{display:flex;flex-direction:column;gap:6px}
+.btchart{height:260px;margin:6px 0 16px}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:12px;margin-bottom:12px}.stats>div{display:flex;flex-direction:column;gap:2px}.stats b{font-size:1.1rem}
+.seg.wrap{flex-wrap:wrap}.center{text-align:center}
