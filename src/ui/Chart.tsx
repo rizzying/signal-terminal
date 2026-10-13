@@ -3,7 +3,7 @@ import { createChart, CrosshairMode, type IChartApi, type ISeriesApi, type IPric
 import type { Candle } from "../engine/indicators";
 import type { Analysis, Setup } from "../engine/scan";
 import type { OIPoint } from "../api/positioning";
-import { lineSpecs, PriceLines } from "./chartLines";
+import { declutter, lineSpecs, PriceLines } from "./chartLines";
 
 let cv: CanvasRenderingContext2D | null = null;
 /** Resolve a CSS custom property (may be color-mix()) to an rgba() string the chart library can parse. */
@@ -45,7 +45,14 @@ export function Chart({ candles, analysis, setup, zone, theme, viewKey, oi, live
     const s = series.current; const last = candles.at(-1); if (!s || !live || !last || live.t < last.t) return;
     try { s.update({ time: (live.t / 1000) as Time, open: live.o, high: live.h, low: live.l, close: live.c }); } catch { /* out-of-order tick */ }
   }, [live, candles]);
-  function drawLines() { lines.current?.sync(lineSpecs(setup, zone, analysis, { accent: css("--accent"), neg: css("--neg"), pos: css("--pos"), warn: css("--warn") })); if (el.current) el.current.dataset.lines = String(lines.current?.count ?? 0); }
+  const drawRef = useRef<(force?: boolean) => void>(() => {});
+  useEffect(() => { // re-check label collisions after zoom/pan/resize (axis scale changes); only redraws when labels change
+    const c = chart.current; if (!c) return; let raf = 0; const f = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => drawRef.current(false)); };
+    c.timeScale().subscribeVisibleLogicalRangeChange(f); const ro = new ResizeObserver(f); if (el.current) ro.observe(el.current); f();
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); try { c.timeScale().unsubscribeVisibleLogicalRangeChange(f); } catch { /* removed */ } };
+  }, [ready]);
+  drawRef.current = (force?: boolean) => drawLines(force);
+  function drawLines(force = true) { const sp = lineSpecs(setup, zone, analysis, { accent: css("--accent"), neg: css("--neg"), pos: css("--pos"), warn: css("--warn") }); const s = series.current; lines.current?.sync(s ? declutter(sp, (p) => s.priceToCoordinate(p)) : sp, force); if (el.current) el.current.dataset.lines = String(lines.current?.count ?? 0); }
   useEffect(() => {
     const s = series.current; if (!s) return;
     drawLines();

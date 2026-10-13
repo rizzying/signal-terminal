@@ -2,7 +2,7 @@ import { useLiveCandle } from "./useLiveCandle";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { candles as loadCandles, feeFor, marketsCached, roundTick, tfsFor, topOfBook, type Book, type Exchange, type Market, type TF } from "../api/markets";
 import type { Candle } from "../engine/indicators";
-import { analyze, fmt, roundSetup, HTF, MIN_CANDLES, scan, type Dir, type Setup } from "../engine/scan";
+import { analyze, fmt, roundSetup, type Analysis, HTF, MIN_CANDLES, scan, type Dir, type Setup } from "../engine/scan";
 import type { Settings } from "../engine/settings";
 import { db, type ChecklistItem } from "../journal/db";
 import { Chart } from "./Chart";
@@ -89,7 +89,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
         <button className="btn long" disabled={!analysis || !!busy} onClick={() => run("long")}>{busy === "long" ? "Scanning…" : "Scan long"}</button>
         <button className="btn short" disabled={!analysis || !!busy} onClick={() => run("short")}>{busy === "short" ? "Scanning…" : "Scan short"}</button>
       </div>
-      {setup && <Result book={book} ex={ex} setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks })} onAlert={() => { const z = setup.zones[zone]; addAlert({ exchange: ex, symbol: sym, kind: "zone", lo: z.bottom, hi: z.top, label: `${setup.dir} Zone ${z.rank} entry ${fmt(z.bottom)}–${fmt(z.top)}` }); }} threshold={settings.threshold} />}
+      {setup && <Result analysis={analysis} book={book} ex={ex} setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks })} onAlert={() => { const z = setup.zones[zone]; addAlert({ exchange: ex, symbol: sym, kind: "zone", lo: z.bottom, hi: z.top, label: `${setup.dir} Zone ${z.rank} entry ${fmt(z.bottom)}–${fmt(z.top)}` }); }} threshold={settings.threshold} />}
       {setup && Object.keys(cmp).length > 0 && <Compare cmp={cmp} current={ex} zone={zone} onPick={(e) => setEx(e)} dir={setup.dir} />}
       <AlertsCard />
       <div className="card">
@@ -105,7 +105,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
   );
 }
 
-function Result({ book, ex, setup, zone, setZone, onJournal, onAlert, threshold }: { book: Book | null; ex: Exchange; setup: Setup; zone: number; setZone: (n: number) => void; onJournal: () => void; onAlert: () => void; threshold: number }) {
+function Result({ analysis, book, ex, setup, zone, setZone, onJournal, onAlert, threshold }: { analysis?: Analysis | null; book: Book | null; ex: Exchange; setup: Setup; zone: number; setZone: (n: number) => void; onJournal: () => void; onAlert: () => void; threshold: number }) {
   const [alerted, setAlerted] = useState<number | null>(null);
   const s = setup;
   return (
@@ -132,6 +132,7 @@ function Result({ book, ex, setup, zone, setZone, onJournal, onAlert, threshold 
             {z.pastStop ? <span className="alert small">Price is already past the stop: this zone is invalid for now.</span> : z.pastTp1 ? <span className="alert small">Price already beyond TP1. Wait for a retrace into the entry zone.</span> : null}
             <span className="dim small costs">Costs {fmt(z.costs.total)} = spread {fmt(z.costs.spread)} + fees {fmt(z.costs.fees)}{z.costs.slip ? ` + slippage ${fmt(z.costs.slip)}` : ""}. Stop widened from {fmt(z.rawStop)}.</span>
             <span className="dim small">{z.source}{z.note ? ` · ${z.note}` : ""}</span>
+            {(() => { const L = setup.dir === "long"; const lq = analysis?.liq.filter((b) => (L ? b.long : b.short) > 0 && b.price >= z.bottom && b.price <= z.top) ?? []; return lq.length ? <span className="dim small">Est. liq cluster ({L ? "longs" : "shorts"}) inside this entry zone at {lq.map((b) => fmt(b.price)).join(", ")}.</span> : null; })()}
           </button>
         ))}
       </div>

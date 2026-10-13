@@ -40,3 +40,21 @@ describe("Today", () => {
     expect(n!.titles).toEqual(["CPI m/m", "CPI y/y"]);
   });
 });
+import { declutter, lineSpecs } from "../src/ui/chartLines";
+describe("chart axis labels (regression: est. liq covering Entry top/bottom, BTC short 4H)", () => {
+  const col = { accent: "a", neg: "n", pos: "p", warn: "w" };
+  const setup: any = { dir: "short", price: 84000, zones: [null, { top: 85448.8, bottom: 85326.2, stop: 86100, t1: 82300, t2: 81000 }] };
+  const analysis: any = { liq: [{ price: 85354, long: 0, short: 9 }, { price: 85600, long: 0, short: 5 }, { price: 88000, long: 0, short: 4 }] };
+  const toY = (p: number) => 400 - (p - 80000) * 0.06; // ~0.06 px per $ → entry band is ~7px tall
+  const out = declutter(lineSpecs(setup, 1, analysis, col), toY);
+  const shown = out.filter((x) => x.label !== false);
+  it("keeps every line but no two visible labels overlap", () => {
+    expect(out).toHaveLength(8); const ys = shown.map((x) => toY(x.price)!).sort((a, b) => a - b);
+    for (let i = 1; i < ys.length; i++) expect(ys[i] - ys[i - 1]).toBeGreaterThanOrEqual(18);
+  });
+  it("trade levels win; liq inside the entry band loses its label", () => {
+    expect(shown.map((x) => x.title)).toEqual(expect.arrayContaining(["Entry", "Stop", "TP1"]));
+    expect(out.find((x) => x.price === 85354)!.label).toBe(false); expect(out.find((x) => x.price === 88000)!.label).toBe(true);
+  });
+  it("leaves labels alone when there's room", () => { const wide = declutter(lineSpecs(setup, 1, null, col), (p) => (90000 - p)); expect(wide.every((x) => x.label)).toBe(true); expect(wide[0].title).toBe("Entry top"); });
+});
