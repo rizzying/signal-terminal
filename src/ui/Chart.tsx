@@ -15,7 +15,7 @@ export const css = (v: string) => {
   cv.clearRect(0, 0, 1, 1); cv.fillStyle = "#888"; cv.fillStyle = resolved; cv.fillRect(0, 0, 1, 1);
   const [r, g, b, a] = cv.getImageData(0, 0, 1, 1).data; return `rgba(${r},${g},${b},${(a / 255).toFixed(3)})`;
 };
-export function Chart({ candles, analysis, setup, zone, theme, viewKey, oi }: { candles: Candle[]; analysis: Analysis | null; setup: Setup | null; zone: number; theme: string; viewKey: string; oi?: OIPoint[] | null }) {
+export function Chart({ candles, analysis, setup, zone, theme, viewKey, oi, live }: { live?: Candle | null; candles: Candle[]; analysis: Analysis | null; setup: Setup | null; zone: number; theme: string; viewKey: string; oi?: OIPoint[] | null }) {
   const oiSeries = useRef<ISeriesApi<"Line"> | null>(null);
   const el = useRef<HTMLDivElement>(null); const chart = useRef<IChartApi | null>(null); const series = useRef<ISeriesApi<"Candlestick"> | null>(null); const lines = useRef<PriceLines<IPriceLine> | null>(null); const [ready, setReady] = useState(0);
   useEffect(() => {
@@ -41,6 +41,10 @@ export function Chart({ candles, analysis, setup, zone, theme, viewKey, oi }: { 
     s.setData(candles.map((k) => ({ time: (k.t / 1000) as Time, open: k.o, high: k.h, low: k.l, close: k.c })));
     if (candles.length) { c.timeScale().setVisibleLogicalRange({ from: candles.length - 120, to: candles.length + 6 }); s.priceScale().applyOptions({ autoScale: true }); }
   }, [viewKey, candles]);
+  useEffect(() => { // live tick: update/append only the forming candle (no re-scan)
+    const s = series.current; const last = candles.at(-1); if (!s || !live || !last || live.t < last.t) return;
+    try { s.update({ time: (live.t / 1000) as Time, open: live.o, high: live.h, low: live.l, close: live.c }); } catch { /* out-of-order tick */ }
+  }, [live, candles]);
   function drawLines() { lines.current?.sync(lineSpecs(setup, zone, analysis, { accent: css("--accent"), neg: css("--neg"), pos: css("--pos"), warn: css("--warn") })); if (el.current) el.current.dataset.lines = String(lines.current?.count ?? 0); }
   useEffect(() => {
     const s = series.current; if (!s) return;

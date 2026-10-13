@@ -214,4 +214,9 @@ export function scan(c: Candle[], dir: Dir, s: Settings, opts: { maxLev?: number
 export const confidenceBand = (c: number): "Low" | "Medium" | "High" => (c > 70 ? "High" : c >= 50 ? "Medium" : "Low");
 export const MIN_CANDLES = 30;
 export const HTF: Record<string, string | undefined> = { "1m": "15m", "5m": "1h", "15m": "4h", "1h": "4h", "4h": "1d", "12h": "3d", "1d": "1w", "3d": "1w", "1w": undefined };
+/** Snap a setup's prices to the exchange tick. Stops round away from entry so rounding never shrinks risk. */
+export function roundSetup(st: Setup, round: (p: number, mode?: "near" | "down" | "up") => number): Setup {
+  const L = st.dir === "long";
+  return { ...st, zones: st.zones.map((z) => ({ ...z, top: round(z.top), bottom: round(z.bottom), entry: round(z.entry), stop: round(z.stop, L ? "down" : "up"), rawStop: round(z.rawStop, L ? "down" : "up"), t1: round(z.t1, L ? "up" : "down"), t2: round(z.t2, L ? "up" : "down") })) };
+}
 export function fmt(n: number) { if (!Number.isFinite(n)) return "–"; const a = Math.abs(n); const d = a >= 1000 ? 1 : a >= 10 ? 2 : a >= 1 ? 4 : 6; return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: d }); }

@@ -139,3 +139,8 @@ table.split{width:100%;margin:8px 0}table.split th,table.split td{text-align:rig
 .labs-badge{margin-left:6px;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 5px;border-radius:6px;color:var(--ink-2);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent);vertical-align:1px}
 .chartcard .cardhead{flex-wrap:nowrap}.chartcard .cardhead>.lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chartcard .cardhead>.row{flex-shrink:0}
 main{min-height:100vh}
+.livedot{width:7px;height:7px;border-radius:50%;display:inline-block;background:var(--ink-3);align-self:center}.livedot.live{background:var(--pos);box-shadow:0 0 0 3px color-mix(in srgb,var(--pos) 25%,transparent)}
+.badge.new{margin-left:6px;color:var(--ink);box-shadow:0 0 0 1px var(--accent);font-size:11px}
+.today{display:grid;gap:14px}@media (min-width:48rem){.today{grid-template-columns:1fr 1fr}.today>p{grid-column:1/-1}}
+.tile .big{font-size:1.15rem;margin:6px 0}.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 0}.kv dt{font-size:12px;color:var(--ink-2)}.kv dd{margin:2px 0 0}
+.list{list-style:none;padding:0;margin:6px 0 0;display:grid;gap:6px}.list li{display:flex;gap:6px;align-items:center;flex-wrap:wrap}

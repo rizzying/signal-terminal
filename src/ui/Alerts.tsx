@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { candles, type Exchange } from "../api/markets";
-import { hitsRange, loadAlerts, notify, saveAlerts, type Alert } from "../alerts";
+import { hlSocket } from "../api/live";
+import { hits, hitsRange, loadAlerts, notify, saveAlerts, type Alert } from "../alerts";
 import { fmt } from "../engine/scan";
 
 /** Polls prices for active alerts every 20s while the app is open. */
@@ -19,6 +20,17 @@ export function useAlertWatcher() {
       if (changed) saveAlerts(as);
     };
     tick(); const t = setInterval(tick, 20_000); return () => clearInterval(t);
+  }, []);
+  // Instant: Hyperliquid mid prices over the WebSocket (polling above stays as the fallback and covers Bulk/Binance)
+  useEffect(() => {
+    let off: (() => void) | null = null;
+    const sync = () => { const need = loadAlerts().some((a) => !a.firedAt && a.exchange === "hyperliquid");
+      if (need && !off) off = hlSocket().subscribe({ type: "allMids" }, (mids: Record<string, string>) => {
+        const as = loadAlerts(); let changed = false;
+        for (const a of as) { if (a.firedAt || a.exchange !== "hyperliquid") continue; const p = Number(mids[a.symbol]); if (Number.isFinite(p) && hits(a, p)) { a.firedAt = Date.now(); changed = true; notify(`Signal · ${a.symbol}`, `${a.label} (price ${fmt(p)})`); } }
+        if (changed) saveAlerts(as); });
+      else if (!need && off) { off(); off = null; } };
+    sync(); addEventListener("sig-alerts", sync); return () => { removeEventListener("sig-alerts", sync); off?.(); };
   }, []);
 }
 export function AlertsCard() {

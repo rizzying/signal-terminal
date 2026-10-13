@@ -1,7 +1,8 @@
+import { useLiveCandle } from "./useLiveCandle";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { candles as loadCandles, feeFor, listMarkets, tfsFor, topOfBook, type Book, type Exchange, type Market, type TF } from "../api/markets";
+import { candles as loadCandles, feeFor, marketsCached, roundTick, tfsFor, topOfBook, type Book, type Exchange, type Market, type TF } from "../api/markets";
 import type { Candle } from "../engine/indicators";
-import { analyze, fmt, HTF, MIN_CANDLES, scan, type Dir, type Setup } from "../engine/scan";
+import { analyze, fmt, roundSetup, HTF, MIN_CANDLES, scan, type Dir, type Setup } from "../engine/scan";
 import type { Settings } from "../engine/settings";
 import { db, type ChecklistItem } from "../journal/db";
 import { Chart } from "./Chart";
@@ -20,6 +21,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
   const [ex, setEx] = useState<Exchange>(() => (localStorage.getItem("sig.ex") as Exchange) || "hyperliquid");
   const [sym, setSym] = useState<string>(() => localStorage.getItem("sig.sym") || DEF_SYM[ex]);
   const [tf, setTf] = useState<TF>(() => (localStorage.getItem("sig.tf") as TF) || "4h");
+  const [missing, setMissing] = useState<string | null>(null);
   const [markets, setMarkets] = useState<Market[]>([]); const [marketsFor, setMarketsFor] = useState<Exchange | null>(null); const [q, setQ] = useState(""); const [open, setOpen] = useState(false);
   const [data, setData] = useState<Candle[]>([]); const [err, setErr] = useState<string | null>(null); const [loading, setLoading] = useState(false);
   const [setup, setSetup] = useState<Setup | null>(null); const [zone, setZone] = useState(1); const [lastDir, setLastDir] = useState<Dir | null>(null);
@@ -30,7 +32,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
   useEffect(() => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); }, [ex, sym, tf]);
   useEffect(() => {
     let live = true; setMarkets([]);
-    listMarkets(ex).then((m) => { if (!live) return; setMarkets(m); setMarketsFor(ex); if (!m.some((x) => x.symbol === sym)) { const b = baseAsset(sym); setSym(m.find((x) => baseAsset(x.symbol) === b)?.symbol ?? m.find((x) => x.symbol === DEF_SYM[ex])?.symbol ?? m[0]?.symbol ?? DEF_SYM[ex]); } }).catch((e) => live && setErr(String(e.message ?? e)));
+    marketsCached(ex).then((m) => { if (!live) return; setMarkets(m); setMarketsFor(ex); setMissing(null); if (!m.some((x) => x.symbol === sym)) { const b = baseAsset(sym); const same = m.find((x) => baseAsset(x.symbol) === b)?.symbol; const next = same ?? m.find((x) => x.symbol === DEF_SYM[ex])?.symbol ?? m[0]?.symbol ?? DEF_SYM[ex]; if (!same) setMissing(`${b} isn't listed on ${EX.find((e) => e.id === ex)!.name}, so this shows ${baseAsset(next)}.`); setSym(next); } }).catch((e) => live && setErr(String(e.message ?? e)));
     return () => { live = false; };
   }, [ex]);
   useEffect(() => {
@@ -49,7 +51,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
     try {
       const h = HTF[tf]; const [htf, bk] = await Promise.all([settings.useHtf && h ? loadCandles(ex, sym, h as TF, 200).catch(() => null) : null, topOfBook(ex, sym).catch(() => null)]);
       const st = scan(data, dir, settings, { maxLev: market?.maxLev, htf, htfTf: h, costs: bk ? { spread: bk.spread, feePct: feeFor(ex, settings) } : { spread: 0, feePct: feeFor(ex, settings) } });
-      setSetup(st); setBook(bk); setLastDir(dir); ranFor.current = [data, settings]; if (!auto) { setZone(1); setTicks({}); }
+      setSetup(market?.tick ? roundSetup(st, (p, m) => roundTick(p, market.tick, m)) : st); setBook(bk); setLastDir(dir); ranFor.current = [data, settings]; if (!auto) { setZone(1); setTicks({}); }
       const key = `${baseAsset(sym)}|${tf}|${dir}`; const row = { symbol: sym, label: market?.label ?? sym, setup: st, book: bk, at: Date.now() };
       setCmp((p) => (cmpFor.current === key ? { ...p, [ex]: row } : { [ex]: row })); cmpFor.current = key;
     } catch (e: any) { setSetup(null); setErr(e.message ?? String(e)); } finally { setBusy(null); }
@@ -61,7 +63,8 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
     ranFor.current = k; if (analysis && data.length >= MIN_CANDLES) run(lastDir, true); else if (data.length) setSetup(null);
   }, [data, settings, loading]);
   const saveChecklist = (c: ChecklistItem[]) => { setChecklist(c); db.set("checklist", c); };
-  const last = data.at(-1);
+  const { candle: liveC, mode: liveMode } = useLiveCandle(ex, sym, tf, marketsFor === ex);
+  const last = liveC && data.length && liveC.t >= data.at(-1)!.t ? liveC : data.at(-1);
   return (
     <section className="stack rise">
       <div className="card controls">
@@ -69,16 +72,17 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
         <div className="symbox">
           <label className="lbl" htmlFor="sym">Symbol</label>
           <input id="sym" className="input" autoComplete="off" placeholder={market?.label ?? sym} value={open ? q : market?.label ?? sym} onFocus={() => { setOpen(true); setQ(""); }} onBlur={() => setTimeout(() => setOpen(false), 150)} onChange={(e) => setQ(e.target.value)} />
-          {open && <ul className="menu" role="listbox">{filtered.map((m) => <li key={m.symbol}><button role="option" aria-selected={m.symbol === sym} onMouseDown={(e) => e.preventDefault()} onClick={() => { setSym(m.symbol); setOpen(false); }}>{m.label}<span className="mono dim">{m.maxLev}x</span></button></li>)}{!filtered.length && <li className="dim pad">{markets.length ? "No match" : "Loading markets…"}</li>}</ul>}
+          {open && <ul className="menu" role="listbox">{filtered.map((m) => <li key={m.symbol}><button role="option" aria-selected={m.symbol === sym} onMouseDown={(e) => e.preventDefault()} onClick={() => { setSym(m.symbol); setOpen(false); setMissing(null); }}>{m.label}<span className="mono dim">{m.maxLev}x</span></button></li>)}{!filtered.length && <li className="dim pad">{markets.length ? "No match" : "Loading markets…"}</li>}</ul>}
           <span className="mono dim small">{markets.length} markets</span>
         </div>
         <div className="seg" role="tablist" aria-label="Timeframe">{tfsFor(ex).map((t) => <button key={t} role="tab" aria-selected={tf === t} className={tf === t ? "on" : ""} onClick={() => setTf(t)}>{t.toUpperCase()}</button>)}</div>
       </div>
       <div className="card chartcard">
-        <div className="cardhead"><span className="lbl">{market?.label ?? sym} · {tf.toUpperCase()} · {EX.find((e) => e.id === ex)!.name}</span><span className="row gap"><button className={`chip ${showOi ? "on" : ""}`} aria-pressed={showOi} onClick={() => setShowOi(!showOi)}>OI line{showOi && oi === null ? " (n/a)" : ""}</button><span className="mono">{last ? fmt(last.c) : loading ? "Loading…" : "–"}</span></span></div>
+        <div className="cardhead"><span className="lbl">{market?.label ?? sym} · {tf.toUpperCase()} · {EX.find((e) => e.id === ex)!.name}</span><span className="row gap"><button className={`chip ${showOi ? "on" : ""}`} aria-pressed={showOi} onClick={() => setShowOi(!showOi)}>OI line{showOi && oi === null ? " (n/a)" : ""}</button><span className="mono" aria-live="off">{last ? fmt(last.c) : loading ? "Loading…" : "–"}</span>{last && <span className={`livedot ${liveMode}`} title={liveMode === "live" ? "Live (WebSocket)" : "Updating every 15s"} aria-label={liveMode === "live" ? "Live prices" : "Prices update every 15 seconds"} />}</span></div>
+        {missing && <p className="note small" role="status">{missing}</p>}
         {err && <p className="alert" role="alert">{err}</p>}
         {!loading && !err && data.length > 0 && data.length < MIN_CANDLES && <p className="alert" role="status">Only {data.length} candles on {tf.toUpperCase()} for this market (needs {MIN_CANDLES} to scan). Try a lower timeframe.</p>}
-        <Chart candles={data} analysis={analysis} setup={setup} zone={zone} theme={theme} viewKey={`${ex}|${sym}|${tf}`} oi={showOi ? oi ?? null : null} />
+        <Chart candles={data} analysis={analysis} setup={setup} zone={zone} theme={theme} viewKey={`${ex}|${sym}|${tf}`} oi={showOi ? oi ?? null : null} live={liveC} />
       </div>
       <div className="card controls"><StrategySelect value={stratId} onChange={onPickStrategy} current={settings} zone={zone} /></div>
       <div className="scanrow">

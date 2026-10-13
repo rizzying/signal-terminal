@@ -8,7 +8,8 @@ export const TF_MS: Record<TF, number> = { "1m": 6e4, "5m": 3e5, "15m": 9e5, "1h
 /** Intervals each exchange's public candle API serves (all verified live Oct 2026). Unsupported ones are hidden in the UI. */
 export const EX_TFS: Record<"hyperliquid" | "bulk" | "binance", TF[]> = { hyperliquid: TFS, bulk: TFS, binance: TFS };
 export const tfsFor = (ex: "hyperliquid" | "bulk" | "binance") => EX_TFS[ex];
-export type Market = { symbol: string; label: string; maxLev: number };
+/** tick = smallest price step (from the exchange), used for display and zone rounding. */
+export type Market = { symbol: string; label: string; maxLev: number; tick?: number };
 
 type F = typeof fetch;
 const buckets: Record<Exchange, TokenBucket> = { hyperliquid: new TokenBucket(4, 10), bulk: new TokenBucket(4, 20), binance: new TokenBucket(8, 20) };
@@ -44,14 +45,15 @@ const hl = (body: object, f?: F) => getJson("hyperliquid", HL, { method: "POST",
 export async function listMarkets(ex: Exchange, f?: F): Promise<Market[]> {
   if (ex === "hyperliquid") {
     const m = await hl({ type: "meta" }, f);
-    return m.universe.filter((u: any) => !u.isDelisted).map((u: any) => ({ symbol: u.name, label: `${u.name}-PERP`, maxLev: u.maxLeverage }));
+    // Hyperliquid perps: price decimals = 6 − szDecimals (and at most 5 significant figures)
+    return m.universe.filter((u: any) => !u.isDelisted).map((u: any) => ({ symbol: u.name, label: `${u.name}-PERP`, maxLev: u.maxLeverage, tick: 10 ** -Math.max(0, 6 - (u.szDecimals ?? 0)) }));
   }
   if (ex === "bulk") {
     const m = await getJson("bulk", `${BULK}/exchangeInfo`, undefined, f);
-    return m.filter((s: any) => s.status !== "SUSPENDED" && s.status !== "DELISTED").map((s: any) => ({ symbol: s.symbol, label: s.symbol, maxLev: s.maxLeverage ?? 20 }));
+    return m.filter((s: any) => s.status === "TRADING").map((s: any) => ({ symbol: s.symbol, label: s.symbol, maxLev: s.maxLeverage ?? 20, tick: +s.tickSize || (s.pricePrecision != null ? 10 ** -s.pricePrecision : undefined) }));
   }
   const m = await getJson("binance", `${BN}/exchangeInfo?permissions=SPOT`, undefined, f);
-  return m.symbols.filter((s: any) => s.status === "TRADING").map((s: any) => ({ symbol: s.symbol, label: `${s.baseAsset}/${s.quoteAsset}`, maxLev: 20 }));
+  return m.symbols.filter((s: any) => s.status === "TRADING").map((s: any) => ({ symbol: s.symbol, label: `${s.baseAsset}/${s.quoteAsset}`, maxLev: 20, tick: +(s.filters?.find((x: any) => x.filterType === "PRICE_FILTER")?.tickSize ?? 0) || undefined }));
 }
 
 export async function candles(ex: Exchange, symbol: string, tf: TF, n = 300, f?: F): Promise<Candle[]> {
@@ -98,3 +100,10 @@ export async function hlRange(symbol: string, tf: TF, start: number, end: number
   return r.map((k: any) => ({ t: k.t, o: +k.o, h: +k.h, l: +k.l, c: +k.c, v: +k.v }));
 }
 
+
+/** Round a price to the exchange tick. mode "away" rounds away from `from` (used for stops so rounding never tightens risk). */
+export function roundTick(p: number, tick?: number, mode: "near" | "down" | "up" = "near") { if (!tick || !Number.isFinite(p)) return p; const n = p / tick; const k = mode === "down" ? Math.floor(n + 1e-9) : mode === "up" ? Math.ceil(n - 1e-9) : Math.round(n); return +(k * tick).toFixed(Math.max(0, Math.ceil(-Math.log10(tick)))); }
+export const tickDecimals = (tick?: number) => (tick ? Math.max(0, Math.ceil(-Math.log10(tick) - 1e-9)) : undefined);
+/** Cached market list per exchange (shared by Scan, Watchlist, Market). */
+const mlCache = new Map<Exchange, Promise<Market[]>>();
+export function marketsCached(ex: Exchange) { let p = mlCache.get(ex); if (!p) { p = listMarkets(ex).catch((e) => { mlCache.delete(ex); throw e; }); mlCache.set(ex, p); } return p; }

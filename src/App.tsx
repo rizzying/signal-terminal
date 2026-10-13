@@ -1,13 +1,13 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { DEFAULTS, sanitize, type Settings } from "./engine/settings";
 import { db, uid, type Trade } from "./journal/db";
-import { ScanView, type Draft } from "./ui/Scan";
+import type { Draft } from "./ui/Scan";
 import { useAlertWatcher } from "./ui/Alerts";
 import { useLabs, getLabs } from "./labs";
 import { activeId, setActiveId, type Strategy } from "./strategies";
 
-type Tab = "scan" | "market" | "watch" | "backtest" | "calendar" | "wallets" | "journal" | "settings";
-const ALL_TABS: { id: Tab; name: string; more?: boolean; labs?: boolean }[] = [{ id: "scan", name: "Scan" }, { id: "market", name: "Market" }, { id: "watch", name: "Watchlist" }, { id: "backtest", name: "Backtest", more: true, labs: true }, { id: "calendar", name: "Calendar", more: true }, { id: "wallets", name: "Wallets", more: true }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings", more: true }];
+type Tab = "today" | "scan" | "market" | "watch" | "backtest" | "calendar" | "wallets" | "journal" | "settings";
+const ALL_TABS: { id: Tab; name: string; more?: boolean; labs?: boolean }[] = [{ id: "today", name: "Today" }, { id: "scan", name: "Scan" }, { id: "market", name: "Market" }, { id: "watch", name: "Watchlist" }, { id: "backtest", name: "Backtest", more: true, labs: true }, { id: "calendar", name: "Calendar", more: true }, { id: "wallets", name: "Wallets", more: true }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings", more: true }];
 const Watchlist = lazy(() => import("./ui/Watchlist").then((m) => ({ default: m.Watchlist })));
 const Wallets = lazy(() => import("./ui/Wallets").then((m) => ({ default: m.Wallets })));
 const MarketView = lazy(() => import("./ui/Market").then((m) => ({ default: m.MarketView })));
@@ -15,11 +15,13 @@ const BacktestView = lazy(() => import("./ui/Backtest").then((m) => ({ default: 
 const CalendarView = lazy(() => import("./ui/Calendar").then((m) => ({ default: m.CalendarView })));
 const JournalView = lazy(() => import("./ui/Journal").then((m) => ({ default: m.JournalView })));
 const SettingsView = lazy(() => import("./ui/SettingsView").then((m) => ({ default: m.SettingsView })));
+const ScanView = lazy(() => import("./ui/Scan").then((m) => ({ default: m.ScanView })));
+const TodayView = lazy(() => import("./ui/Today").then((m) => ({ default: m.TodayView })));
 export default function App() {
   useAlertWatcher();
   const [more, setMore] = useState(false);
   const labs = useLabs(); const TABS = ALL_TABS.filter((t) => t.id !== "backtest" || labs.backtest);
-  const [tab, setTab] = useState<Tab>(() => { const h = location.hash.slice(1) as Tab; return h === "backtest" && !getLabs().backtest ? "scan" : h || "scan"; });
+  const [tab, setTab] = useState<Tab>(() => { const h = location.hash.slice(1) as Tab; return h === "backtest" && !getLabs().backtest ? "scan" : h || "today"; });
   useEffect(() => { if (tab === "backtest" && !labs.backtest) setTab("scan"); }, [tab, labs.backtest]);
   const [theme, setTheme] = useState(() => localStorage.getItem("sig.theme") || "dark");
   const [settings, setSettingsS] = useState<Settings>(DEFAULTS); const [prefill, setPrefill] = useState<Trade | null>(null);
@@ -61,8 +63,9 @@ export default function App() {
       </header>
       <main>
         {!ready ? <p className="dim small center" role="status">Loading…</p> : <>
-        {tab === "scan" && <ScanView stratId={stratId} onPickStrategy={pickStrategy} settings={settings} theme={theme} onJournal={journal} />}
         <Suspense fallback={<p className="dim small center" role="status">Loading…</p>}>
+        {tab === "today" && <TodayView settings={settings} go={setTab} />}
+        {tab === "scan" && <ScanView stratId={stratId} onPickStrategy={pickStrategy} settings={settings} theme={theme} onJournal={journal} />}
         {tab === "watch" && <Watchlist settings={settings} onOpen={(ex, sym, tf) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); setTab("scan"); }} />}
         {tab === "market" && <MarketView />}
         {tab === "backtest" && labs.backtest && <BacktestView settings={settings} stratId={stratId} theme={theme} />}
@@ -72,7 +75,7 @@ export default function App() {
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}
         </Suspense></>}
       </main>
-      <footer className="foot dim small">Signal v2.4 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v2.5 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }
