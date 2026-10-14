@@ -2,7 +2,7 @@
 import { neon } from "@neondatabase/serverless";
 import { runJob } from "../src/forward/job";
 const url = process.env.DATABASE_URL;
-if (!url) { console.error("DATABASE_URL is not set: add it as a GitHub Actions secret."); process.exit(1); }
+if (!url) { console.log("::warning::DATABASE_URL secret is not set yet; skipping the forward test run."); process.exit(0); }
 const sql = neon(url);
 const r = await runJob((text, params) => sql.query(text, params as any[]) as Promise<any[]>);
 console.log(`done: +${r.inserted} snapshots, ${r.resolved} status changes, ${r.errors.length} errors`);
