@@ -36,12 +36,17 @@ export function unrealR(t, px) { const entry = +t.entry, risk = +t.risk || Math.
 export function openWhatIfR(rows, trades, live) { let sum = 0, n = 0; for (const x of rows) { if (x.status !== "open") continue; const t = trades.find((y) => String(y.id) === x.id); const r = t && unrealR(t, live?.[t.market]?.px); if (r != null) { sum += r; n++; } } return { n, r: sum }; }
 /** MFE/MAE in R (research only, never used for exits/scoring). Conservative on the fill candle: it is SKIPPED, because inside one 1H candle we can't
  * tell if its high/low came before or after the fill. Uses closed 1H candles that open at/after fill_t (fill_t = fill candle close) and before exit_t
- * (exit_t = exit candle close, so the exit candle counts), or up to now for open trades (plus the live price if given). Gross R, no costs. */
-export function excursion(t, K, fillT, exitT, nowPx) {
+ * (exit_t = exit candle close, so the exit candle counts), or up to now for open trades. For open trades `now` is the currently-forming 1H candle
+ * ({t,h,l}, its high/low so far; a bare number = last price, legacy) so the result never shrinks as the live price moves within the hour. Gross R, no costs. */
+export function excursion(t, K, fillT, exitT, now) {
   if (fillT == null) return { mfe: null, mae: null }; const L = t.side === "long", entry = +t.entry, risk = +t.risk || Math.abs(entry - +t.sl); if (!(risk > 0)) return { mfe: null, mae: null };
   let best = 0, worst = 0; const f = Number(fillT), e = exitT == null ? Infinity : Number(exitT);
   const upd = (hi, lo) => { const a = ((L ? hi : lo) - entry) * (L ? 1 : -1) / risk, b = ((L ? lo : hi) - entry) * (L ? 1 : -1) / risk; best = Math.max(best, a); worst = Math.min(worst, b); };
   for (const k of K) if (k.t >= f && k.t < e) upd(k.h, k.l);
-  if (exitT == null && nowPx > 0) upd(nowPx, nowPx);
+  if (exitT == null && now != null) { if (typeof now === "number") { if (now > 0) upd(now, now); }
+    else if (now.h > 0 && now.l > 0 && (now.t == null || (Number(now.t) >= f && !K.some((k) => k.t === now.t)))) upd(now.h, now.l); }
   return { mfe: best, mae: worst };
 }
+/** Max-merge a persisted running MFE/MAE (fwd_trades.mfe_r/mae_r) with a freshly computed one, so best/worst never decrease. */
+export function mergeExc(stored, x) { const n = (v) => (v == null || !Number.isFinite(+v) ? null : +v); const sm = n(stored?.mfe_r), sa = n(stored?.mae_r);
+  return { mfe: x.mfe == null && sm == null ? null : Math.max(sm ?? -Infinity, x.mfe ?? -Infinity), mae: x.mae == null && sa == null ? null : Math.min(sa ?? Infinity, x.mae ?? Infinity) }; }

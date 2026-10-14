@@ -31,5 +31,8 @@ export const PAPER_SCHEMA: string[] = [
   `create unique index if not exists fwd_events_once on fwd_events (strategy, market, kind, t, coalesce(trade_key, ''))`,
   `create table if not exists fwd_trader (strategy text not null, market text not null, last_t bigint not null, primary key (strategy, market))`,
   `alter table fwd_runs add column if not exists paper text`,
+  // v3.1.7: running MFE/MAE in R (research only, never used for exits/scoring); max-merged each run so best/worst never shrink
+  `alter table fwd_trades add column if not exists mfe_r float8`,
+  `alter table fwd_trades add column if not exists mae_r float8`,
 ];
 export async function ensurePaperSchema(q: Q) { await ensureSchema(q); for (const s of PAPER_SCHEMA) await q(s); }

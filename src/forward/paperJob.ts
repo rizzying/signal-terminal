@@ -2,6 +2,8 @@
 import type { Candle } from "../engine/indicators";
 import { SPEC, STRATEGY, rulesHash, plansAt, step, tradeKey, wibDay, type State, type Trade } from "./trader";
 import { ensurePaperSchema, type Q } from "./db";
+// @ts-ignore js module
+import { excursion } from "./shadow.js";
 /** Runs a list of statements atomically (all or nothing). Neon: sql.transaction; PGlite: db.transaction. */
 export type Stmt = { text: string; params: unknown[] }; export type Tx = (stmts: Stmt[]) => Promise<void>;
 /** WIB day as a half-open range [00:00, next 00:00) WIB. Same rule as wibDay() in the trader and today() on the page. */
@@ -30,7 +32,8 @@ export async function paperJob(q: Q, o: { now?: number; klines?: KFetch; funding
   const tx: Tx = o.tx ?? (async (ss) => { for (const x of ss) await q(x.text, x.params); }); // fallback is NOT atomic; production and tests pass a real tx
   await ensurePaperSchema(q); const errors: string[] = []; let events = 0, closed = 0; const srcs = new Set<string>();
   await Promise.all(SPEC.markets.map(async (m) => { try {
-    const c = (await kl(m, SPEC.window + PAPER_CATCHUP + 2)).filter((k) => k.t + H <= now).sort((a, b) => a.t - b.t); if (!c.length) throw new Error("no candles");
+    const raw = await kl(m, SPEC.window + PAPER_CATCHUP + 2); const c = raw.filter((k) => k.t + H <= now).sort((a, b) => a.t - b.t);
+    const forming = raw.find((k) => k.t <= now && k.t + H > now); const touched: Trade[] = []; if (!c.length) throw new Error("no candles");
     const live = await q(`select * from fwd_trades where strategy=$1 and market=$2 and status in ('pending','open')`, [STRATEGY, m]);
     let st: State = { order: null, pos: null }; for (const r of live) st[r.status === "open" ? "pos" : "order"] = toTrade(r);
     const cur = (await q(`select last_t from fwd_trader where strategy=$1 and market=$2`, [STRATEGY, m]))[0]?.last_t;
@@ -49,9 +52,14 @@ export async function paperJob(q: Q, o: { now?: number; klines?: KFetch; funding
       for (const e of r.events) { if (e.tr) w.push(upsert(e.tr)); w.push({ text: `insert into fwd_events (strategy, market, trade_key, kind, t, data) values ($1,$2,$3,$4,$5,$6) on conflict do nothing`, params: [STRATEGY, m, e.tr ? tradeKey(e.tr) : null, e.kind, e.t, JSON.stringify(e.data)] }); }
       for (const t of [r.state.order, r.state.pos]) if (t) w.push(upsert(t)); // bar counts
       w.push(cursorStmt(m, c[i].t)); await tx(w);
+      for (const t of r.closed) if (t.fill_t != null) touched.push(t);
       events += r.events.length; closed += r.closed.filter((t) => t.status === "closed").length; st = r.state;
     }
     if (!todo.length) await tx([cursorStmt(m, Math.max(last, c.at(-1)!.t))]);
+    // running MFE/MAE (research only): max-merged into fwd_trades so best/worst never shrink; open position includes the forming candle's high/low
+    if (st.pos?.fill_t != null) touched.push(st.pos);
+    for (const t of touched) { const x = excursion(t, c, t.fill_t, t.status === "open" ? null : t.exit_t, t.status === "open" ? forming : undefined);
+      if (x.mfe != null) await q(`update fwd_trades set mfe_r = greatest(mfe_r, $2), mae_r = least(mae_r, $3) where key = $1`, [tradeKey(t), x.mfe, x.mae]); }
     log(`${m}: ${todo.length} new candle(s); order ${st.order ? `${st.order.side} @ ${st.order.entry}` : "none"}; position ${st.pos ? `${st.pos.side} @ ${st.pos.entry}` : "none"}`);
   } catch (e: any) { errors.push(`${m}: ${String(e.message ?? e).slice(0, 200)}`); } }));
   return { events, closed, errors, funding: [...srcs].join(",") || null };
