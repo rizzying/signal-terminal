@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LATEST, VERSIONS, VERSION_LABEL } from "../forward/version.js";
-import { progress, SMALL_N } from "../forward/view.js";
+import { nextRunLabel, progress, SMALL_N } from "../forward/view.js";
 import { topOfBook } from "../api/markets";
 import { fmt } from "../engine/scan";
 import { useVisibleInterval } from "./useVisibleInterval";
@@ -34,12 +34,12 @@ function Breakdown({ name, rows }: { name: string; rows: ({ key: string } & Scor
 function Card({ s, px, prevPx, now }: { s: SetupCard; px?: number; prevPx?: number; now: number }) {
   return <article className="card fsetup">
     <div className="cardhead"><h3>{VN[s.venue]} {s.symbol} · {s.tf.toUpperCase()} <span className={`badge ${s.side}`}>{s.side}</span></h3><span className="lbl">{wib(s.close_t)} · {s.conf_band} {s.conf_pct}% · {s.version}</span></div>
-    <div className="fzones">{s.zones.map((z) => { const p = z.outcome === "waiting" && px ? progress(z, s, px, now, s.px ?? prevPx) : null;
+    <div className="fzones">{s.zones.map((z) => { const p = z.outcome === "waiting" && px ? progress(z, s, px, now, s.px ?? prevPx, z.bars ?? 0) : null;
       return <div key={z.zone} className={`fzone ${z.outcome}`}>
         <div className="row between"><b>Z{z.zone}</b><span className={`badge ${z.outcome === "win" ? "long" : z.outcome === "loss" ? "short" : ""}`}>{OUT[z.outcome]}</span></div>
         <dl className="kv"><span>Entry</span><b>{fmt(z.entry_bottom)}–{fmt(z.entry_top)}</b><span>Stop</span><b className="neg">{fmt(z.sl)}</b><span>TP1 / TP2</span><b className="pos">{fmt(z.tp1)} / {fmt(z.tp2)}</b>
           <span>R:R</span><b>{z.rr.toFixed(1)}R{z.rNet != null ? ` · result ${z.rNet >= 0 ? "+" : ""}${z.rNet.toFixed(2)}R` : ""}</b></dl>
-        {p && <p className="small mono">{p.inside ? "Price is in the zone now" : `${(p.gapPct * 100).toFixed(2)}% away${p.gapAtr != null ? ` (${p.gapAtr.toFixed(1)} ATR)` : ""}`}{p.trend && !p.inside ? ` · ${p.trend}` : ""} · {p.barsLeft} bars left</p>}
+        {p && <p className="small mono">{p.inside ? `Price in zone now · fill confirms at next run (${nextRunLabel(now)})` : `${(p.gapPct * 100).toFixed(2)}% away${p.gapAtr != null ? ` (${p.gapAtr.toFixed(1)} ATR)` : ""}${p.trend ? ` · ${p.trend}` : ""} · ${p.barsLeft} bars left`}</p>}
       </div>; })}</div>
   </article>;
 }

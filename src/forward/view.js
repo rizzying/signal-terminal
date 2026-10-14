@@ -58,10 +58,12 @@ export function setups(rows, limit = 40) {
 }
 export function facets(rows) { const u = (f) => [...new Set(rows.map(f))].sort(); return { venue: u((r) => r.venue), symbol: u((r) => base(r.symbol)), tf: Object.keys(TF_MS).filter((t) => rows.some((r) => r.tf === t)) }; }
 /** Live progress for a waiting zone: distance from price to the zone (% and ATR, 0 when inside), trend vs a reference price, bars left before expiry. */
-export function progress(z, s, px, now, refPx) {
+export function progress(z, s, px, now, refPx, barsDone = 0) {
   const long = s.side === "long"; const inside = px >= z.entry_bottom && px <= z.entry_top;
   const gap = inside ? 0 : long ? px - z.entry_top : z.entry_bottom - px; // >0: price still has to travel to the zone
   const ref = refPx ?? s.px; const gapRef = ref == null ? null : long ? ref - z.entry_top : z.entry_bottom - ref;
   const trend = gapRef == null || inside ? null : Math.abs(gap - gapRef) < 1e-12 ? "flat" : gap < gapRef ? "approaching" : "moving away";
-  const elapsed = Math.floor((now - s.close_t) / (TF_MS[s.tf] ?? 3.6e6)); return { inside, gapPct: gap / px, gapAtr: s.atr ? gap / s.atr : null, trend, barsLeft: Math.max(0, FILL_BARS - elapsed) };
+  const elapsed = Math.floor((now - s.close_t) / (TF_MS[s.tf] ?? 3.6e6)); return { inside, gapPct: gap / px, gapAtr: s.atr ? gap / s.atr : null, trend, barsLeft: Math.max(0, FILL_BARS - Math.max(elapsed, barsDone ?? 0)) };
 }
+/** Next hourly job time label in WIB: the cron fires at :07 and usually starts by about :09. */
+export function nextRunLabel(now) { const d = new Date(now + 7 * 3600e3); let h = d.getUTCHours(); if (d.getUTCMinutes() >= 9) h = (h + 1) % 24; return `~${String(h).padStart(2, "0")}:09 WIB`; }
