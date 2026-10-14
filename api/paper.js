@@ -3,6 +3,7 @@ import { shadowReplay, shadowSummary, unrealR, openWhatIfR, excursion } from "..
 import { neon } from "@neondatabase/serverless";
 import { scorecard, parseTradeFilters, filterTrades, tradeCounts, tradesCsv, today, STRATEGY_ID, STRATEGY_NAME, RULES_HASH, MARKETS } from "../src/forward/paper.js";
 export const config = { maxDuration: 20 };
+const riskParam = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 && n <= 1e7 ? n : 100; };
 export default async function handler(req, res) {
   const url = process.env.DATABASE_URL;
   if (!url) { res.setHeader("Cache-Control", "s-maxage=60"); return res.status(200).json({ configured: false }); }
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
     res.setHeader("Cache-Control", "public, s-maxage=120, stale-while-revalidate=600");
     if (q.format === "csv") {
       res.setHeader("Content-Type", "text/csv; charset=utf-8"); res.setHeader("Content-Disposition", `attachment; filename="forward-${STRATEGY_ID}-${new Date().toISOString().slice(0, 10)}.csv"`);
-      return res.status(200).send(tradesCsv([...rowsX].sort((a, b) => Number(a.placed_t) - Number(b.placed_t))));
+      return res.status(200).send(tradesCsv([...rowsX].sort((a, b) => Number(a.placed_t) - Number(b.placed_t)), riskParam(q.risk)));
     }
     return res.status(200).json({ configured: true, strategy: { id: STRATEGY_ID, name: STRATEGY_NAME, rulesHash: RULES_HASH, markets: MARKETS, tf: "1h", zone: 2, data: "Binance spot" },
       lastRun: runs[0] ?? null, cursor: cur, score: scorecard(T), filters: f, counts: tradeCounts(T, f), total: rowsX.length, trades: rowsX.slice(0, 500).map((t) => t.status === "open" && live[t.market] ? { ...t, now: live[t.market].px, ur: unrealR(t, live[t.market].px) } : t), live, events: ev, today: today(T, lim), shadow, at: Date.now() });
