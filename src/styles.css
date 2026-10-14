@@ -206,3 +206,4 @@ main{min-height:100vh}
 .chart-ew-note{position:absolute;top:40px;left:6px;z-index:5;padding:2px 8px;border-radius:6px;background:var(--surface);color:var(--ink-3);box-shadow:var(--ring);pointer-events:none}
 :root{--warn-ew:#b7791f}.dark{--warn-ew:#e0b354}
 .rsub{font-size:.78em;font-weight:400;margin-left:.15em}
+.ztable td .whatif,.ztable td[data-label="Result"]{white-space:normal;min-width:12em}.ztable td .whatif{display:inline-block;max-width:24em}
