@@ -3,6 +3,7 @@ import { createChart, CrosshairMode, type IChartApi, type ISeriesApi, type IPric
 import type { Candle } from "../engine/indicators";
 import type { Analysis, Setup } from "../engine/scan";
 import type { OIPoint } from "../api/positioning";
+import { elliottOverlay } from "../engine/elliott";
 import { declutter, lineSpecs, PriceLines } from "./chartLines";
 
 let cv: CanvasRenderingContext2D | null = null;
@@ -19,6 +20,8 @@ export function Chart({ onPickPrice, candles, analysis, setup, zone, theme, view
   const oiSeries = useRef<ISeriesApi<"Line"> | null>(null);
   const pickRef = useRef(onPickPrice); pickRef.current = onPickPrice;
   const el = useRef<HTMLDivElement>(null); const chart = useRef<IChartApi | null>(null); const series = useRef<ISeriesApi<"Candlestick"> | null>(null); const lines = useRef<PriceLines<IPriceLine> | null>(null); const [ready, setReady] = useState(0);
+  const [ewFound, setEwFound] = useState(true); const [ew, setEw] = useState(() => localStorage.getItem("sig.ew") === "1"); // experimental, display only, off by default
+  useEffect(() => { localStorage.setItem("sig.ew", ew ? "1" : "0"); }, [ew]);
   useEffect(() => {
     if (!el.current) return;
     const c = createChart(el.current, { autoSize: true, crosshair: { mode: CrosshairMode.Normal }, rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.1, bottom: 0.08 } }, timeScale: { borderVisible: false, timeVisible: true, rightOffset: 6 } });
@@ -63,10 +66,11 @@ export function Chart({ onPickPrice, candles, analysis, setup, zone, theme, view
       const t = (i: number) => (candles[i].t / 1000) as Time; const from = candles.length - 150;
       for (const p of analysis.pivots) if (p.label && p.i >= from) marks.push({ time: t(p.i), position: p.kind === "high" ? "aboveBar" : "belowBar", color: css("--ink-3"), shape: "circle", size: 0, text: p.label });
       for (const b of analysis.breaks) if (b.i >= from) marks.push({ time: t(b.i), position: b.dir === "bull" ? "belowBar" : "aboveBar", color: css("--accent"), shape: b.dir === "bull" ? "arrowUp" : "arrowDown", text: b.choch ? "ChoCH" : "BoS" });
+      if (ew) { const f = elliottOverlay(candles); setEwFound(!!f); if (f) for (const l of f.labels) marks.push({ time: t(l.i), position: l.kind === "high" ? "aboveBar" : "belowBar", color: css("--warn-ew"), shape: "square", size: 0, text: `(${l.text})` }); }
       marks.sort((a, b) => (a.time as number) - (b.time as number));
     }
     s.setMarkers(marks);
-  }, [analysis, setup, zone, theme, candles, viewKey, ready, yourLiq]);
+  }, [analysis, setup, zone, theme, candles, viewKey, ready, yourLiq, ew]);
   useEffect(() => {
     const c = chart.current; if (!c) return;
     if (!oi?.length) { if (oiSeries.current) { c.removeSeries(oiSeries.current); oiSeries.current = null; } return; }
@@ -76,5 +80,5 @@ export function Chart({ onPickPrice, candles, analysis, setup, zone, theme, view
     oiSeries.current.setData(oi.filter((p) => p.t >= t0 && p.oiUsd > 0).map((p) => ({ time: (p.t / 1000) as Time, value: p.oiUsd })).filter((p) => !seen.has(p.time as number) && (seen.add(p.time as number), true)));
   }, [oi, theme, candles]);
   const reset = () => { const c = chart.current; if (!c || !candles.length) return; c.timeScale().setVisibleLogicalRange({ from: candles.length - 120, to: candles.length + 6 }); series.current?.priceScale().applyOptions({ autoScale: true }); };
-  return <div className="chartwrap"><div ref={el} className="chart" aria-label="Candlestick chart" /><button className="btn ghost sm chart-reset" onClick={reset}>Reset view</button></div>;
+  return <div className="chartwrap"><div ref={el} className="chart" aria-label="Candlestick chart" /><button className="btn ghost sm chart-reset" onClick={reset}>Reset view</button><label className="btn ghost sm chart-ew"><input type="checkbox" checked={ew} onChange={(e) => setEw(e.target.checked)} /> Elliott Wave (experimental)</label>{ew && <div className="chart-ew-note small">{ewFound ? "One possible count, not a signal" : "No count fits the rules right now · experimental"}</div>}</div>;
 }

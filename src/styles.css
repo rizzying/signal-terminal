@@ -201,3 +201,7 @@ main{min-height:100vh}
 .badge.v-kill { background: rgba(255,92,92,.18); color: var(--neg, #ff5c5c); } .badge.v-promote { background: rgba(46,204,113,.18); color: var(--pos, #2ecc71); }
 @media (max-width: 760px) { .forward .pbars, .forward .fgrid { grid-template-columns: 1fr; } }
 @media (min-width:48rem){.ztable thead th:nth-last-child(-n+3) .hpop{left:auto;right:0}}
+
+.chart-ew{position:absolute;top:6px;left:96px;z-index:5;display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:var(--surface)!important;box-shadow:var(--ring)!important}.chart-ew input{margin:0;accent-color:var(--accent)}
+.chart-ew-note{position:absolute;top:40px;left:6px;z-index:5;padding:2px 8px;border-radius:6px;background:var(--surface);color:var(--ink-3);box-shadow:var(--ring);pointer-events:none}
+:root{--warn-ew:#b7791f}.dark{--warn-ew:#e0b354}
