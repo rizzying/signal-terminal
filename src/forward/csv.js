@@ -1,4 +1,5 @@
 import { rNet } from "./view.js";
+import { LATEST } from "./version.js";
 // CSV export for the forward test (shared by /api/forward?format=csv and tests). Plain JS so the Vercel function can import it.
 export const CSV_CAP = 50000;
 export const CSV_COLS = ["rules_version", "snapshot_time_wib", "snapshot_time_utc", "venue", "symbol", "timeframe", "side", "zone", "entry_low", "entry_high", "stop", "tp1", "tp2", "rr_tp1", "confidence_pct", "confidence_band", "settings_hash", "outcome", "resolved_time_wib", "resolved_time_utc", "bars_to_resolve", "r_net"];
@@ -8,7 +9,7 @@ const pad = (n) => String(n).padStart(2, "0");
 const iso = (t) => (t == null ? "" : new Date(Number(t)).toISOString().replace(/\.\d{3}Z$/, "Z"));
 const wib = (t) => { if (t == null) return ""; const d = new Date(Number(t) + 7 * 3600e3); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} WIB`; };
 const cell = (v) => { if (v == null) return ""; const s = String(v); return /[",\n\r]/.test(s) || /^[=+\-@]/.test(s) && isNaN(Number(s)) ? `"${s.replace(/"/g, '""')}"` : s; };
-export function csvFilename(now, ver) { const d = new Date(Number(now) + 7 * 3600e3); return `signal-forward-${ver && ver !== "v3" ? ver + "-" : ""}${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}-${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}.csv`; }
+export function csvFilename(now, ver) { const d = new Date(Number(now) + 7 * 3600e3); return `signal-forward-${ver && ver !== LATEST ? ver + "-" : ""}${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}-${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}.csv`; }
 /** rows: fwd_snapshots joined with fwd_results (status, done_t, bars). One CSV row per snapshot. */
 export function toCsv(rows) {
   const out = [CSV_COLS.join(",")];
