@@ -1,8 +1,8 @@
-import { rNet } from "./view.js";
+import { rNet, fillPx } from "./view.js";
 import { LATEST } from "./version.js";
 // CSV export for the forward test (shared by /api/forward?format=csv and tests). Plain JS so the Vercel function can import it.
 export const CSV_CAP = 50000;
-export const CSV_COLS = ["rules_version", "snapshot_time_wib", "snapshot_time_utc", "venue", "symbol", "timeframe", "side", "zone", "entry_low", "entry_high", "stop", "tp1", "tp2", "rr_tp1", "confidence_pct", "confidence_band", "settings_hash", "outcome", "resolved_time_wib", "resolved_time_utc", "bars_to_resolve", "r_net"];
+export const CSV_COLS = ["rules_version", "snapshot_time_wib", "snapshot_time_utc", "venue", "symbol", "timeframe", "side", "zone", "entry_low", "entry_high", "stop", "tp1", "tp2", "rr_tp1", "confidence_pct", "confidence_band", "settings_hash", "outcome", "resolved_time_wib", "resolved_time_utc", "bars_to_resolve", "r_net", "fill_time_wib", "fill_price_est"];
 const OUT = { pending: "pending", open: "pending", tp1_open: "TP1", tp1: "TP1", tp2: "TP2", sl: "SL", expired: "expired" };
 export const outcome = (s) => OUT[s] ?? "pending";
 const pad = (n) => String(n).padStart(2, "0");
@@ -16,7 +16,7 @@ export function toCsv(rows) {
   for (const r of rows) {
     const st = r.status ?? "pending"; const o = outcome(st); const done = o === "pending" ? null : r.done_t ?? null;
     const mid = Number(r.entry_mid ?? (Number(r.entry_top) + Number(r.entry_bottom)) / 2); const risk = Math.abs(mid - Number(r.sl)); const rr = risk ? Math.abs(Number(r.tp1) - mid) / risk : null;
-    out.push([r.version ?? "", wib(r.close_t), iso(r.close_t), r.venue, r.symbol, r.tf, r.side, r.zone, r.entry_bottom, r.entry_top, r.sl, r.tp1, r.tp2, rr == null ? "" : rr.toFixed(2), r.conf_pct, r.conf_band, r.settings_hash, o, wib(done), iso(done), o === "pending" ? "" : r.bars, (() => { const x = rNet(r); return x == null ? "" : x.toFixed(3); })()].map(cell).join(","));
+    out.push([r.version ?? "", wib(r.close_t), iso(r.close_t), r.venue, r.symbol, r.tf, r.side, r.zone, r.entry_bottom, r.entry_top, r.sl, r.tp1, r.tp2, rr == null ? "" : rr.toFixed(2), r.conf_pct, r.conf_band, r.settings_hash, o, wib(done), iso(done), o === "pending" ? "" : r.bars, (() => { const x = rNet(r); return x == null ? "" : x.toFixed(3); })(), wib(r.fill_t ?? null), fillPx(r) ?? ""].map(cell).join(","));
   }
   return out.join("\r\n") + "\r\n";
 }

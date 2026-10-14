@@ -46,3 +46,11 @@ describe("v4 feeds + 15m catch-up on an hourly job", () => {
     expect(logs.find((l) => l.startsWith("bulk BTC-USD 15m"))).toMatch(/\(4 new candles\)/); expect(logs.find((l) => l.startsWith("hyperliquid BTC 1h"))).toMatch(/\(1 new candle\)/);
   }, 60_000);
 });
+import { fillCounts, zoneRows, fillTab } from "../src/forward/view.js";
+it("fill tabs: filled = running/TP1/TP2/SL, waiting, expired; zone rows sortable with estimated fill price", () => {
+  const rs = [row({ status: "open", fill_t: 5 }), row({ status: "tp1", fill_t: 5, close_t: 3 * H }), row({ status: "sl", fill_t: 5, side: "short", close_t: 2 * H }), row({ status: "pending" }), row({ status: "expired" })];
+  expect(fillCounts(rs)).toEqual({ all: 5, filled: 3, waiting: 1, expired: 1 }); expect(fillTab("tp2")).toBe("filled");
+  expect(filterRows(rs, parseFilters({ fill: "filled" }))).toHaveLength(3); expect(parseFilters({ fill: "x" }).fill).toBeUndefined();
+  const z = zoneRows(rs); expect(z[0].close_t).toBe(3 * H); expect(zoneRows(rs, "asc")[0].close_t).toBe(H);
+  expect(z.find((x) => x.side === "short")!.fill_px).toBe(2463.565); expect(z.find((x) => x.outcome === "running")!.fill_px).toBe(2483.83); expect(z.find((x) => x.outcome === "waiting")!.fill_px).toBeNull();
+});

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LATEST, VERSIONS, VERSION_LABEL } from "../forward/version.js";
-import { nextRunLabel, progress, SMALL_N } from "../forward/view.js";
+import { nextRunLabel, progress, SMALL_N, FILL_TABS } from "../forward/view.js";
 import { topOfBook } from "../api/markets";
 import { fmt } from "../engine/scan";
 import { useVisibleInterval } from "./useVisibleInterval";
@@ -8,7 +8,8 @@ import { useVisibleInterval } from "./useVisibleInterval";
 type Score = { n: number; waiting: number; running: number; win: number; loss: number; expired: number; resolved: number; filled: number; winRate: number | null; avgR: number | null; expiredPct: number | null; small: boolean };
 type Z = { zone: number; entry_bottom: number; entry_top: number; sl: number; tp1: number; tp2: number; rr: number; status: string; outcome: string; rNet: number | null; bars: number | null };
 type SetupCard = { venue: string; symbol: string; tf: string; side: "long" | "short"; candle_t: number; close_t: number; version: string; conf_band: string; conf_pct: number; px: number | null; atr: number | null; zones: Z[] };
-type Data = { configured: boolean; error?: string; lastRun?: { at: string } | null; versions?: { version: string; n: number }[]; hidden?: number; total?: number; score?: Score; by?: Record<string, ({ key: string } & Score)[]>; setups?: SetupCard[]; facets?: { venue: string[]; symbol: string[]; tf: string[] } };
+type ZRow = { close_t: number; venue: string; symbol: string; tf: string; side: string; zone: number; entry_bottom: number; entry_top: number; sl: number; tp1: number; fill_t: number | null; fill_px: number | null; status: string; outcome: string; rNet: number | null };
+type Data = { configured: boolean; error?: string; lastRun?: { at: string } | null; versions?: { version: string; n: number }[]; hidden?: number; total?: number; score?: Score; by?: Record<string, ({ key: string } & Score)[]>; setups?: SetupCard[]; tabs?: Record<string, number>; zones?: ZRow[]; facets?: { venue: string[]; symbol: string[]; tf: string[] } };
 const VN: Record<string, string> = { hyperliquid: "Hyperliquid", bulk: "Bulk" };
 const OUT: Record<string, string> = { waiting: "waiting to fill", running: "filled, running", win: "TP1 hit", loss: "stopped", expired: "not filled (expired)" };
 const wib = (t: number | string) => new Date(t).toLocaleString("en-GB", { timeZone: "Asia/Jakarta", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }) + " WIB";
@@ -16,7 +17,7 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 /** Never a bare % on a small sample: "3 of 7 · small sample". */
 export function rateText(k: number, n: number) { if (!n) return "–"; return n < SMALL_N ? `${k} of ${n} · small sample` : `${pct(k / n)} (${k}/${n})`; }
 const rText = (s: Score) => (s.avgR == null ? "–" : `${s.avgR >= 0 ? "+" : ""}${s.avgR.toFixed(2)}R${s.small ? ` · n=${s.resolved}, small sample` : ""}`);
-const F_KEYS = ["venue", "symbol", "tf", "side", "zone", "status", "from", "to"] as const;
+const F_KEYS = ["venue", "symbol", "tf", "side", "zone", "status", "from", "to", "fill", "order"] as const;
 type Filters = Partial<Record<(typeof F_KEYS)[number], string>>;
 const qs = (v: string, f: Filters) => new URLSearchParams({ v, ...Object.fromEntries(Object.entries(f).filter(([, x]) => x)) }).toString();
 
@@ -30,6 +31,16 @@ function Breakdown({ name, rows }: { name: string; rows: ({ key: string } & Scor
     <tbody>{rows.map((r) => <tr key={r.key}><td data-label={name}><b>{VN[r.key] ?? (name === "timeframe" ? r.key.toUpperCase() : r.key)}</b>{r.small && <span className="badge" title={`Only ${r.resolved} resolved`}>small sample</span>}</td>
       <td data-label="Setups" className="num">{r.n}</td><td data-label="Resolved" className="num">{r.resolved}</td><td data-label="Win rate" className="num">{rateText(r.win, r.resolved)}</td>
       <td data-label="Avg R" className="num">{r.avgR == null ? "–" : r.avgR.toFixed(2)}</td><td data-label="Expired" className="num">{rateText(r.expired, r.filled + r.expired)}</td></tr>)}</tbody></table></div>;
+}
+function ZoneTable({ rows, order, onSort }: { rows: ZRow[]; order: string; onSort: () => void }) {
+  if (!rows.length) return <p className="note">No zones in this view.</p>;
+  return <div className="card"><table className="rt ztable"><thead><tr><th><button className="btn ghost sm" onClick={onSort} aria-label="Sort by time">Logged {order === "asc" ? "↑" : "↓"}</button></th><th>Setup</th><th>Zone</th><th>Entry</th><th>Stop</th><th>TP1</th><th>Fill (WIB) @ price</th><th>Status</th><th>Result</th></tr></thead>
+    <tbody>{rows.map((r, i) => <tr key={i}><td data-label="Logged">{wib(r.close_t)}</td><td data-label="Setup">{VN[r.venue]} <b>{r.symbol}</b> {r.tf.toUpperCase()} <span className={`badge ${r.side}`}>{r.side}</span></td><td data-label="Zone">Z{r.zone}</td>
+      <td data-label="Entry" className="num">{fmt(r.entry_bottom)}–{fmt(r.entry_top)}</td><td data-label="Stop" className="num neg">{fmt(r.sl)}</td><td data-label="TP1" className="num pos">{fmt(r.tp1)}</td>
+      <td data-label="Fill" className="num">{r.fill_t ? <>{wib(r.fill_t)} @ ≈{fmt(r.fill_px!)}</> : "–"}</td><td data-label="Status">{OUT[r.outcome]}</td>
+      <td data-label="Result" className={`num ${r.rNet == null ? "" : r.rNet >= 0 ? "pos" : "neg"}`}>{r.rNet == null ? "–" : `${r.rNet >= 0 ? "+" : ""}${r.rNet.toFixed(2)}R`}</td></tr>)}</tbody></table>
+    {rows.length >= 300 && <p className="dim small">Showing the 300 {order === "asc" ? "oldest" : "newest"}; narrow the filters or export the CSV for all.</p>}
+    <p className="dim small">Fill time is the open of the first closed candle that reached the zone; fill price is estimated as the zone edge it touched.</p></div>;
 }
 function Card({ s, px, prevPx, now }: { s: SetupCard; px?: number; prevPx?: number; now: number }) {
   return <article className="card fsetup">
@@ -79,9 +90,12 @@ export function ForwardView() {
         </div>
         {!!d.hidden && <p className="dim small">{d.hidden} repeated row{d.hidden === 1 ? "" : "s"} (same setup logged again while still open) hidden from stats, cards and CSV. Nothing is deleted.</p>}
       </div>
+      <div className="seg ftabs" role="tablist" aria-label="Fill status">{(["filled", "waiting", "expired", "all"] as const).map((t) => <button key={t} role="tab" aria-selected={(f.fill ?? "all") === t} className={(f.fill ?? "all") === t ? "on" : ""} onClick={() => set("fill", t === "all" ? "" : t)}>{t === "all" ? "All" : (FILL_TABS as Record<string, string>)[t]} <span className="mono dim">{d.tabs?.[t] ?? 0}</span></button>)}</div>
       {!d.total ? <p className="note">No setups match{ver !== "all" ? ` under ${(VERSION_LABEL as Record<string, string>)[ver]}` : ""} yet. New ones appear after the next hourly run.</p> : <>
         <Board s={s} />
         <div className="fbreak">{([["zone", "zone"], ["tf", "timeframe"], ["venue", "venue"], ["side", "side"], ["symbol", "coin"]] as const).map(([k, n]) => <Breakdown key={k} name={n} rows={d.by?.[k] ?? []} />)}</div>
+        <h3>Zones <span className="dim small">({d.total} · one row per zone)</span></h3>
+        <ZoneTable rows={d.zones ?? []} order={f.order ?? "desc"} onSort={() => set("order", (f.order ?? "desc") === "desc" ? "asc" : "")} />
         <h3>Latest setups <span className="dim small">({Math.min(40, d.setups?.length ?? 0)} newest)</span></h3>
         <div className="fcards">{d.setups!.map((x) => <Card key={`${x.venue}|${x.symbol}|${x.tf}|${x.side}|${x.candle_t}`} s={x} px={px[`${x.venue}|${x.symbol}`]} prevPx={prev.current[`${x.venue}|${x.symbol}`]} now={now} />)}</div>
       </>}

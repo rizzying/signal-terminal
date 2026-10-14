@@ -179,3 +179,4 @@ main{min-height:100vh}
 .fcards{display:grid;gap:14px}@media (min-width:64rem){.fcards{grid-template-columns:repeat(auto-fill,minmax(36rem,1fr))}}
 .fzones{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))}.fzone{background:var(--field);box-shadow:var(--ring);border-radius:var(--r-control);padding:10px;display:grid;gap:6px;min-width:0}
 .fzone.win{box-shadow:inset 3px 0 0 var(--pos),var(--ring)}.fzone.loss{box-shadow:inset 3px 0 0 var(--neg),var(--ring)}.fzone.expired{opacity:.7}
+.ftabs{overflow-x:auto;max-width:100%}.ftabs button{white-space:nowrap}.ztable td{white-space:nowrap}@media (max-width:47.99rem){.ztable td{white-space:normal}}

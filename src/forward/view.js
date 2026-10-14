@@ -31,11 +31,11 @@ const dayWib = (t) => new Date(num(t) + 7 * 3600e3).toISOString().slice(0, 10);
 export function parseFilters(q = {}) {
   const pick = (k, ok) => (q[k] && ok(String(q[k])) ? String(q[k]) : undefined); const d = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s);
   return { venue: pick("venue", (s) => s in FEE_PCT), symbol: pick("symbol", (s) => /^[A-Z0-9]{1,15}$/.test(s)), tf: pick("tf", (s) => s in TF_MS), side: pick("side", (s) => s === "long" || s === "short"),
-    zone: pick("zone", (s) => /^[123]$/.test(s)), status: pick("status", (s) => ["waiting", "running", "win", "loss", "expired"].includes(s)), from: pick("from", d), to: pick("to", d) };
+    zone: pick("zone", (s) => /^[123]$/.test(s)), fill: pick("fill", (s) => s in FILL_TABS), status: pick("status", (s) => ["waiting", "running", "win", "loss", "expired"].includes(s)), from: pick("from", d), to: pick("to", d) };
 }
 export function filterRows(rows, f) {
   return rows.filter((r) => (!f.venue || r.venue === f.venue) && (!f.symbol || base(r.symbol) === f.symbol) && (!f.tf || r.tf === f.tf) && (!f.side || r.side === f.side) && (!f.zone || String(r.zone) === f.zone)
-    && (!f.status || outcome(r.status) === f.status) && (!f.from || dayWib(r.close_t) >= f.from) && (!f.to || dayWib(r.close_t) <= f.to));
+    && (!f.status || outcome(r.status) === f.status) && (!f.fill || fillTab(r.status) === f.fill) && (!f.from || dayWib(r.close_t) >= f.from) && (!f.to || dayWib(r.close_t) <= f.to));
 }
 export function score(rows) {
   const c = { n: rows.length, waiting: 0, running: 0, win: 0, loss: 0, expired: 0 }; let sumR = 0, nR = 0;
@@ -67,3 +67,15 @@ export function progress(z, s, px, now, refPx, barsDone = 0) {
 }
 /** Next hourly job time label in WIB: the cron fires at :07 and usually starts by about :09. */
 export function nextRunLabel(now) { const d = new Date(now + 7 * 3600e3); let h = d.getUTCHours(); if (d.getUTCMinutes() >= 9) h = (h + 1) % 24; return `~${String(h).padStart(2, "0")}:09 WIB`; }
+/** Fill tabs: filled = entered (running, TP1, TP2, SL); waiting = not filled yet; expired = never filled within 24 candles. */
+export const FILL_TABS = { filled: "Filled", waiting: "Not filled", expired: "Expired / no fill" };
+export const fillTab = (st) => { const o = outcome(st); return o === "waiting" ? "waiting" : o === "expired" ? "expired" : "filled"; };
+export function fillCounts(rows) { const c = { all: rows.length, filled: 0, waiting: 0, expired: 0 }; for (const r of rows) c[fillTab(r.status)]++; return c; }
+/** Estimated fill price: the zone edge price first touched (limit order at the near edge). */
+export const fillPx = (r) => (r.fill_t == null ? null : r.side === "long" ? num(r.entry_top) : num(r.entry_bottom));
+/** Zone-level rows for the table, newest (or oldest) first. */
+export function zoneRows(rows, order = "desc", limit = 300) {
+  const k = order === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => k * (num(a.close_t) - num(b.close_t)) || num(a.zone) - num(b.zone)).slice(0, limit).map((r) => ({ close_t: num(r.close_t), venue: r.venue, symbol: r.symbol, tf: r.tf, side: r.side, zone: num(r.zone),
+    entry_bottom: num(r.entry_bottom), entry_top: num(r.entry_top), sl: num(r.sl), tp1: num(r.tp1), fill_t: num(r.fill_t), fill_px: fillPx(r), status: r.status, outcome: outcome(r.status), rNet: rNet(r) }));
+}

@@ -2,7 +2,7 @@
 import { neon } from "@neondatabase/serverless";
 import { toCsv, csvFilename, CSV_CAP } from "../src/forward/csv.js";
 import { VERSION_SQL, parseVersion } from "../src/forward/version.js";
-import { hideRepeats, parseFilters, filterRows, score, breakdown, setups, facets, DIMS } from "../src/forward/view.js";
+import { hideRepeats, parseFilters, filterRows, score, breakdown, setups, facets, DIMS, fillCounts, zoneRows } from "../src/forward/view.js";
 export const config = { maxDuration: 20 };
 export default async function handler(req, res) {
   const url = process.env.DATABASE_URL;
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
       sql.query(`select at, inserted, resolved, (errors is not null) as had_errors from fwd_runs order by id desc limit 1`),
       sql.query(`select ${V} as version, count(*)::int as n from fwd_snapshots s group by 1 order by 1 desc`),
     ]);
-    const shown = hideRepeats(raw); const rows = filterRows(shown, f); const hidden = raw.length - shown.length;
+    const shown = hideRepeats(raw); const rows = filterRows(shown, f); const tabCounts = fillCounts(filterRows(shown, { ...f, fill: undefined })); const hidden = raw.length - shown.length;
     if (q.format === "csv") {
       res.setHeader("Content-Type", "text/csv; charset=utf-8"); res.setHeader("Content-Disposition", `attachment; filename="${csvFilename(Date.now(), ver)}"`);
       res.setHeader("Cache-Control", "public, s-maxage=120, stale-while-revalidate=600"); if (raw.length >= CSV_CAP) res.setHeader("X-Row-Cap", String(CSV_CAP));
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     }
     res.setHeader("Cache-Control", "public, s-maxage=120, stale-while-revalidate=600");
     return res.status(200).json({ configured: true, lastRun: runs[0] ?? null, version: ver, versions, filters: f, hidden, total: rows.length,
-      score: score(rows), by: Object.fromEntries(Object.keys(DIMS).map((d) => [d, breakdown(rows, d)])), setups: setups(rows, 40), facets: facets(shown), at: Date.now() });
+      score: score(rows), by: Object.fromEntries(Object.keys(DIMS).map((d) => [d, breakdown(rows, d)])), setups: setups(rows, 40), facets: facets(shown), tabs: tabCounts, zones: zoneRows(rows, q.order === "asc" ? "asc" : "desc", 300), at: Date.now() });
   } catch (e) {
     res.setHeader("Cache-Control", "s-maxage=30");
     const msg = String(e?.message ?? e).replace(/postgres(ql)?:\/\/[^\s]+/g, "postgres://***");
