@@ -24,3 +24,8 @@ export async function copyText(t: string): Promise<boolean> {
     try { const a = document.createElement("textarea"); a.value = t; a.setAttribute("readonly", ""); a.style.position = "fixed"; a.style.opacity = "0"; document.body.appendChild(a); a.select(); const ok = document.execCommand("copy"); a.remove(); return ok; } catch { return false; }
   }
 }
+export const TOAST_MS = 2500;
+/** Which zone a chart click at this price falls in (−1 if none). Small padding so thin bands are clickable. */
+export function zoneAtPrice(zs: { bottom: number; top: number }[], p: number): number {
+  return zs.findIndex((z) => { const pad = Math.max((z.top - z.bottom) * 0.15, z.top * 0.0005); return p >= z.bottom - pad && p <= z.top + pad; });
+}

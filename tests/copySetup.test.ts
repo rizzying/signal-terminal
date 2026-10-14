@@ -12,3 +12,9 @@ it("spot and liq-before-stop variants", () => {
   expect(setupText({ ...base, lev: null, liq: null })).toContain("Leverage: spot, no liquidation");
   expect(setupText({ ...base, liqBeforeStop: true })).toContain("(before stop!)");
 });
+
+import { zoneAtPrice, TOAST_MS } from "../src/ui/copySetup";
+it("chart click maps price to a zone; toast lasts ~2.5s", () => {
+  const zs = [{ bottom: 100, top: 110 }, { bottom: 90, top: 95 }, { bottom: 70, top: 72 }];
+  expect(zoneAtPrice(zs, 105)).toBe(0); expect(zoneAtPrice(zs, 95.5)).toBe(1); expect(zoneAtPrice(zs, 80)).toBe(-1); expect(TOAST_MS).toBe(2500);
+});

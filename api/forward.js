@@ -1,11 +1,19 @@
 // Vercel function: public, read-only forward-test results (aggregated counts). Cached at the edge.
 import { neon } from "@neondatabase/serverless";
+import { toCsv, csvFilename, CSV_CAP } from "../src/forward/csv.js";
 export const config = { maxDuration: 15 };
 export default async function handler(req, res) {
   const url = process.env.DATABASE_URL;
   if (!url) { res.setHeader("Cache-Control", "s-maxage=60"); return res.status(200).json({ configured: false }); }
   try {
     const sql = neon(url);
+    if (req.query?.format === "csv") { // read-only export, every snapshot (capped), newest last
+      const rows = await sql.query(`select s.venue, s.symbol, s.tf, s.side, s.zone, s.conf_band, s.conf_pct, s.close_t, s.entry_bottom, s.entry_top, s.entry_mid, s.sl, s.tp1, s.tp2, s.settings_hash,
+        coalesce(r.status, 'pending') as status, r.done_t, r.bars from fwd_snapshots s left join fwd_results r on r.snapshot_id = s.id order by s.close_t, s.id limit ${CSV_CAP}`);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8"); res.setHeader("Content-Disposition", `attachment; filename="${csvFilename(Date.now())}"`);
+      res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600"); if (rows.length >= CSV_CAP) res.setHeader("X-Row-Cap", String(CSV_CAP));
+      return res.status(200).send(toCsv(rows));
+    }
     const [groups, runs, recent, span] = await Promise.all([
       sql.query(`select s.venue, s.symbol, s.tf, s.zone, s.conf_band, s.side, coalesce(r.status, 'pending') as status, count(*)::int as n
         from fwd_snapshots s left join fwd_results r on r.snapshot_id = s.id group by 1,2,3,4,5,6,7`),

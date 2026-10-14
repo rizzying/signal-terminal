@@ -38,7 +38,7 @@ export function ForwardView() {
   return (
     <section className="stack rise forward">
       <div className="card stack">
-        <div className="cardhead"><h2>Forward test</h2><span className="badge">live · still growing</span></div>
+        <div className="cardhead"><h2>Forward test</h2><span className="row gap"><span className="badge">live · still growing</span><a className="btn sm" href="/api/forward?format=csv" download>Export CSV</a></span></div>
         <p className="small">Every hour, Signal checks BTC, ETH and SOL on 1H and 4H, on Hyperliquid and on Bulk. When the default strategy finds a setup, it saves all 3 zones and never changes them. Then it watches what price does next.</p>
         <p className="dim small"><b>Filled</b> = price reached the entry zone within 24 candles. <b>TP1 / TP2 / Stop</b> = what was hit first after filling (if a stop and a target fall in the same candle, it counts as a stop). Only finished candles are used. This is real, unseen data, but it's still young: small numbers can change a lot. Not financial advice.</p>
         {d.lastRun && <p className="dim small">Last update {wib(d.lastRun.at)}.{bulkSpan ? ` Bulk feed since ${wib(Number(bulkSpan.first))}.` : ""}</p>}

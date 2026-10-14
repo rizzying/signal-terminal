@@ -15,8 +15,9 @@ export const css = (v: string) => {
   cv.clearRect(0, 0, 1, 1); cv.fillStyle = "#888"; cv.fillStyle = resolved; cv.fillRect(0, 0, 1, 1);
   const [r, g, b, a] = cv.getImageData(0, 0, 1, 1).data; return `rgba(${r},${g},${b},${(a / 255).toFixed(3)})`;
 };
-export function Chart({ candles, analysis, setup, zone, theme, viewKey, oi, live, yourLiq = null }: { yourLiq?: number | null; live?: Candle | null; candles: Candle[]; analysis: Analysis | null; setup: Setup | null; zone: number; theme: string; viewKey: string; oi?: OIPoint[] | null }) {
+export function Chart({ onPickPrice, candles, analysis, setup, zone, theme, viewKey, oi, live, yourLiq = null }: { onPickPrice?: (price: number) => void; yourLiq?: number | null; live?: Candle | null; candles: Candle[]; analysis: Analysis | null; setup: Setup | null; zone: number; theme: string; viewKey: string; oi?: OIPoint[] | null }) {
   const oiSeries = useRef<ISeriesApi<"Line"> | null>(null);
+  const pickRef = useRef(onPickPrice); pickRef.current = onPickPrice;
   const el = useRef<HTMLDivElement>(null); const chart = useRef<IChartApi | null>(null); const series = useRef<ISeriesApi<"Candlestick"> | null>(null); const lines = useRef<PriceLines<IPriceLine> | null>(null); const [ready, setReady] = useState(0);
   useEffect(() => {
     if (!el.current) return;
@@ -24,6 +25,7 @@ export function Chart({ candles, analysis, setup, zone, theme, viewKey, oi, live
     series.current = c.addCandlestickSeries({ borderVisible: false }); chart.current = c; lines.current = new PriceLines(series.current); setReady((n) => n + 1);
     return () => { c.remove(); oiSeries.current = null; chart.current = null; series.current = null; lines.current = null; };
   }, []);
+  useEffect(() => { const c = chart.current; if (!c) return; const h = (p: { point?: { x: number; y: number } }) => { if (!p.point || !series.current) return; const v = series.current.coordinateToPrice(p.point.y); if (v != null) pickRef.current?.(v as number); }; c.subscribeClick(h); return () => { try { c.unsubscribeClick(h); } catch { /* chart gone */ } }; }, [ready]);
   useEffect(() => {
     // read theme colours on the next frame, after <html class="dark"> has been updated
     const id = requestAnimationFrame(() => applyTheme()); applyTheme(); return () => cancelAnimationFrame(id);
