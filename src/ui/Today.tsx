@@ -5,7 +5,7 @@ import { mmrFor } from "../engine/liq";
 import type { Settings } from "../engine/settings";
 import { loadAlerts, type Alert } from "../alerts";
 import { loadSnap } from "./Watchlist";
-import type { CalEvent } from "./Calendar";
+import { PMOdds, type CalEvent } from "./Calendar";
 import { useVisibleInterval } from "./useVisibleInterval";
 
 const EXN: Record<Exchange, string> = { hyperliquid: "Hyperliquid", bulk: "Bulk", binance: "Binance" };
@@ -13,7 +13,7 @@ const wib = (t: number) => new Date(t).toLocaleString("en-GB", { timeZone: "Asia
 export function countdown(ms: number) { if (ms <= 0) return "now"; const s = Math.floor(ms / 1000), d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
   return d ? `${d}d ${h}h ${m}m` : h ? `${h}h ${m}m ${String(x).padStart(2, "0")}s` : `${m}m ${String(x).padStart(2, "0")}s`; }
 /** Pick the next event: the soonest one still in the future (events at the same minute are grouped). */
-export function nextEvent(evs: CalEvent[], now: number) { const f = evs.filter((e) => Date.parse(e.time) > now).sort((a, b) => Date.parse(a.time) - Date.parse(b.time)); if (!f.length) return null; const t = f[0].time; return { time: Date.parse(t), titles: f.filter((e) => e.time === t).map((e) => e.title) }; }
+export function nextEvent(evs: CalEvent[], now: number) { const f = evs.filter((e) => Date.parse(e.time) > now).sort((a, b) => Date.parse(a.time) - Date.parse(b.time)); if (!f.length) return null; const t = f[0].time; const events = f.filter((e) => e.time === t); return { time: Date.parse(t), titles: events.map((e) => e.title), events }; }
 
 function Tile({ title, go, label, children }: { title: string; go: () => void; label: string; children: React.ReactNode }) {
   return <section className="card tile"><div className="cardhead"><h2>{title}</h2><button className="btn ghost sm" onClick={go}>{label} →</button></div>{children}</section>;
@@ -49,7 +49,11 @@ export function TodayView({ settings, go }: { settings: Settings; go: (tab: "sca
       </Tile>
       <Tile title="Next event" go={() => go("calendar")} label="Calendar">
         {ev === undefined ? <p className="dim" role="status">Loading…</p> : ev === "err" || ev === null ? <p className="dim">{ev === null ? "No more high-impact US events this month." : "Calendar unavailable right now."}</p> :
-          <><p className="big mono" aria-live="off">{countdown(ev.time - now)}</p><p><b>{ev.titles.slice(0, 2).join(", ")}{ev.titles.length > 2 ? ` +${ev.titles.length - 2} more` : ""}</b></p><p className="dim small">{wib(ev.time)} WIB</p></>}
+          <><p className="big mono" aria-live="off">{countdown(ev.time - now)}</p><p><b>{ev.titles.slice(0, 2).join(", ")}{ev.titles.length > 2 ? ` +${ev.titles.length - 2} more` : ""}</b></p><p className="dim small">{wib(ev.time)} WIB</p>
+          {ev.events.slice(0, 3).map((e) => <div key={e.title} className="evx">{ev.events.length > 1 && <p className="small"><b>{e.title}</b></p>}
+            {e.forecast == null && e.previous == null ? <p className="dim small">No forecast or previous value yet.</p> :
+              <div className="stats"><div><span className="lbl">Forecast</span><b className="mono">{e.forecast ?? "none yet"}</b></div>{e.previous != null && <div><span className="lbl">Previous</span><b className="mono">{e.previous}</b></div>}</div>}
+            {e.polymarket ? <PMOdds pm={e.polymarket} /> : <p className="dim small">No Polymarket market for this event.</p>}</div>)}</>}
       </Tile>
       <Tile title="Alerts" go={() => go("scan")} label="Manage">
         {!alerts.length ? <p className="dim">No alerts. Set one from a zone on the Scan tab.</p> :

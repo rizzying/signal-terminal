@@ -38,6 +38,9 @@ describe("Today", () => {
     const ev = (title: string, time: string) => ({ title, time, forecast: null, previous: null, actual: null, source: "" });
     const n = nextEvent([ev("old", "2026-10-01T08:30:00-04:00"), ev("CPI m/m", "2026-10-14T08:30:00-04:00"), ev("CPI y/y", "2026-10-14T08:30:00-04:00"), ev("FOMC", "2026-10-28T14:00:00-04:00")], Date.parse("2026-10-13T12:00:00Z"));
     expect(n!.titles).toEqual(["CPI m/m", "CPI y/y"]);
+    const pm = { title: "CPI", url: "u", outcomes: [{ label: "≥0.3%", p: 0.6 }], volume: null };
+    const m = nextEvent([{ ...ev("CPI m/m", "2026-10-14T08:30:00-04:00"), forecast: "0.3%", previous: "0.4%", polymarket: pm }], Date.parse("2026-10-13T12:00:00Z"));
+    expect(m!.events[0]).toMatchObject({ forecast: "0.3%", previous: "0.4%", polymarket: pm }); // Today's Next event card reads these
   });
 });
 import { declutter, lineSpecs } from "../src/ui/chartLines";

@@ -62,7 +62,7 @@ export default function App() {
         </nav>
         <button className="btn ghost sm" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={() => { const t = theme === "dark" ? "light" : "dark"; document.documentElement.classList.toggle("dark", t === "dark"); setTheme(t); }}>{theme === "dark" ? "Light" : "Dark"}</button>
       </header>
-      <main>
+      <main className={`pg-${tab}`}>
         {!ready ? <p className="dim small center" role="status">Loading…</p> : <>
         <Suspense fallback={<p className="dim small center" role="status">Loading…</p>}>
         {tab === "forward" && (labs.forward ? <ForwardView /> : <section className="card stack" data-labs-off><h2>Forward test</h2><p className="dim">This is a Labs feature. Turn on "Forward test" under Labs in Settings to see it.</p></section>)}
@@ -77,7 +77,7 @@ export default function App() {
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}
         </Suspense></>}
       </main>
-      <footer className="foot dim small">Signal v2.7 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v2.7.2 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }

@@ -71,7 +71,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
   const { candle: liveC, mode: liveMode } = useLiveCandle(ex, sym, tf, marketsFor === ex);
   const last = liveC && data.length && liveC.t >= data.at(-1)!.t ? liveC : data.at(-1);
   return (
-    <section className="stack rise">
+    <section className="stack rise scanpage">
       <div className="card controls">
         <div className="seg" role="tablist" aria-label="Exchange">{EX.map((e) => <button key={e.id} role="tab" aria-selected={ex === e.id} className={ex === e.id ? "on" : ""} onClick={() => setEx(e.id)}>{e.name}</button>)}</div>
         <div className="symbox">

@@ -19,7 +19,7 @@
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
 h2{font-size:15px;font-weight:500;margin:0;letter-spacing:-.01em}h3{margin:0 0 6px}
-.app{max-width:72rem;margin:0 auto;padding:24px 32px 64px}
+.app{max-width:none;margin:0 auto;padding:24px 32px 64px}
 .top{display:flex;align-items:center;gap:16px;margin-bottom:32px}
 .brand{font-weight:600;font-size:16px;letter-spacing:-.02em;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:8px}
 .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
@@ -154,3 +154,17 @@ main{min-height:100vh}
 .stepper{display:inline-flex;align-items:center;gap:4px}.stepper .step{min-width:40px;min-height:40px;font-size:18px;line-height:1;padding:0}
 .forward .statrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}.forward .statrow>p{grid-column:1/-1;margin:0}.forward .stat b{font-size:1.4rem;display:block;margin-top:4px}
 .forward .seg{flex-wrap:wrap}
+
+/* v2.7.2 desktop: full width, multi-column */
+@media (min-width:80rem){
+  .app{padding:24px 40px 64px}
+  .scanpage:has(>.result){grid-template-columns:minmax(0,1fr) minmax(26rem,34%);align-items:start}
+  .scanpage>*{grid-column:1}
+  .scanpage>.result{grid-column:2;grid-row:1/span 8}
+  .scanpage>.result .zones{grid-template-columns:1fr}
+  main:is(.pg-market,.pg-watch,.pg-calendar,.pg-journal,.pg-wallets,.pg-settings)>section.stack{grid-template-columns:repeat(auto-fill,minmax(min(100%,34rem),1fr));align-items:start}
+  main:is(.pg-market,.pg-watch,.pg-calendar,.pg-journal,.pg-wallets,.pg-settings)>section.stack>:is(:first-child,:has(table),.full){grid-column:1/-1}
+  .today{grid-template-columns:repeat(auto-fill,minmax(min(100%,26rem),1fr));align-items:start}
+}
+@media (min-width:80rem){.chartwrap{height:560px}}@media (min-width:120rem){.chartwrap{height:680px}}
+.evx{margin:8px 0 0}.evx .stats{margin-bottom:6px}

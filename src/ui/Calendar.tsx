@@ -16,6 +16,12 @@ export function ruleOfThumb(e: Pick<CalEvent, "title" | "forecast" | "actual">):
   return { general, verdict };
 }
 
+export function PMOdds({ pm }: { pm?: PM | null }) {
+  if (!pm) return null;
+  return <div className="pm"><span className="lbl">Polymarket odds · <a href={pm.url} target="_blank" rel="noopener noreferrer">{pm.title}</a></span>
+    <ul className="pmlist">{pm.outcomes.map((o) => <li key={o.label}><span>{o.label}</span><span className="bar" aria-hidden><i style={{ width: `${Math.round(o.p * 100)}%` }} /></span><b className="mono">{Math.round(o.p * 100)}%</b></li>)}</ul></div>;
+}
+
 export function CalendarView() {
   const [cal, setCal] = useState<Cal | null>(null); const [err, setErr] = useState<string | null>(null);
   useEffect(() => { fetch("/api/calendar").then((r) => { if (!r.ok) throw new Error(); return r.json(); }).then(setCal).catch(() => setErr("Couldn't load the calendar right now. Try again in a minute.")); }, []);
@@ -39,8 +45,7 @@ export function CalendarView() {
               <div><span className="lbl">Previous</span><b className="mono">{e.previous ?? "–"}</b></div>
               <div><span className="lbl">Actual</span><b className="mono">{e.actual ?? (past ? (e.pendingActual ? "awaiting FRED" : "not available") : "pending")}</b></div>
             </div>
-            {e.polymarket && <div className="pm"><span className="lbl">Polymarket odds · <a href={e.polymarket.url} target="_blank" rel="noopener noreferrer">{e.polymarket.title}</a></span>
-              <ul className="pmlist">{e.polymarket.outcomes.map((o) => <li key={o.label}><span>{o.label}</span><span className="bar" aria-hidden><i style={{ width: `${Math.round(o.p * 100)}%` }} /></span><b className="mono">{Math.round(o.p * 100)}%</b></li>)}</ul></div>}
+            <PMOdds pm={e.polymarket} />
             <p className="small"><span className="badge">rule of thumb, not advice</span> {r.verdict && <b className={r.verdict === "bullish" ? "pos" : r.verdict === "bearish" ? "neg" : ""}>{r.verdict} vs forecast · </b>}<span className="dim">{r.general}</span></p>
             <p className="dim small">Source: {e.source}</p>
           </article>
