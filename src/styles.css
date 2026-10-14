@@ -200,3 +200,4 @@ main{min-height:100vh}
 .forward details[open] > summary { margin-bottom: 12px; }
 .badge.v-kill { background: rgba(255,92,92,.18); color: var(--neg, #ff5c5c); } .badge.v-promote { background: rgba(46,204,113,.18); color: var(--pos, #2ecc71); }
 @media (max-width: 760px) { .forward .pbars, .forward .fgrid { grid-template-columns: 1fr; } }
+@media (min-width:48rem){.ztable thead th:nth-last-child(-n+3) .hpop{left:auto;right:0}}
