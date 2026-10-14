@@ -152,3 +152,5 @@ main{min-height:100vh}
 .zkv dd{margin:0;font-family:var(--mono);font-weight:600;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .zcost{display:block;line-height:1.35}
 .stepper{display:inline-flex;align-items:center;gap:4px}.stepper .step{min-width:40px;min-height:40px;font-size:18px;line-height:1;padding:0}
+.forward .statrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}.forward .statrow>p{grid-column:1/-1;margin:0}.forward .stat b{font-size:1.4rem;display:block;margin-top:4px}
+.forward .seg{flex-wrap:wrap}

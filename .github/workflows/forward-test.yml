@@ -1,0 +1,21 @@
+# Hourly forward test: snapshot Signal setups on closed candles and resolve open ones. Read-only market data, no trading.
+# GitHub may delay or skip scheduled runs; the job is idempotent and catches up missed candles (up to 72 per feed).
+name: forward-test
+on:
+  schedule:
+    - cron: "7 * * * *"   # 7 minutes past every hour (after the 1H/4H close)
+  workflow_dispatch: {}
+concurrency: { group: forward-test, cancel-in-progress: false }
+permissions: { contents: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsx scripts/forward.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

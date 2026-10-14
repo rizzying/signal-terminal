@@ -6,8 +6,8 @@ import { useAlertWatcher } from "./ui/Alerts";
 import { useLabs, getLabs } from "./labs";
 import { activeId, setActiveId, type Strategy } from "./strategies";
 
-type Tab = "today" | "scan" | "market" | "watch" | "backtest" | "calendar" | "wallets" | "journal" | "settings";
-const ALL_TABS: { id: Tab; name: string; more?: boolean; labs?: boolean }[] = [{ id: "today", name: "Today" }, { id: "scan", name: "Scan" }, { id: "market", name: "Market" }, { id: "watch", name: "Watchlist" }, { id: "backtest", name: "Backtest", more: true, labs: true }, { id: "calendar", name: "Calendar", more: true }, { id: "wallets", name: "Wallets", more: true }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings", more: true }];
+type Tab = "forward" | "today" | "scan" | "market" | "watch" | "backtest" | "calendar" | "wallets" | "journal" | "settings";
+const ALL_TABS: { id: Tab; name: string; more?: boolean; labs?: boolean }[] = [{ id: "today", name: "Today" }, { id: "scan", name: "Scan" }, { id: "market", name: "Market" }, { id: "watch", name: "Watchlist" }, { id: "forward", name: "Forward test", more: true }, { id: "backtest", name: "Backtest", more: true, labs: true }, { id: "calendar", name: "Calendar", more: true }, { id: "wallets", name: "Wallets", more: true }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings", more: true }];
 const Watchlist = lazy(() => import("./ui/Watchlist").then((m) => ({ default: m.Watchlist })));
 const Wallets = lazy(() => import("./ui/Wallets").then((m) => ({ default: m.Wallets })));
 const MarketView = lazy(() => import("./ui/Market").then((m) => ({ default: m.MarketView })));
@@ -16,6 +16,7 @@ const CalendarView = lazy(() => import("./ui/Calendar").then((m) => ({ default: 
 const JournalView = lazy(() => import("./ui/Journal").then((m) => ({ default: m.JournalView })));
 const SettingsView = lazy(() => import("./ui/SettingsView").then((m) => ({ default: m.SettingsView })));
 const ScanView = lazy(() => import("./ui/Scan").then((m) => ({ default: m.ScanView })));
+const ForwardView = lazy(() => import("./ui/Forward").then((m) => ({ default: m.ForwardView })));
 const TodayView = lazy(() => import("./ui/Today").then((m) => ({ default: m.TodayView })));
 export default function App() {
   useAlertWatcher();
@@ -64,6 +65,7 @@ export default function App() {
       <main>
         {!ready ? <p className="dim small center" role="status">Loading…</p> : <>
         <Suspense fallback={<p className="dim small center" role="status">Loading…</p>}>
+        {tab === "forward" && <ForwardView />}
         {tab === "today" && <TodayView settings={settings} go={setTab} />}
         {tab === "scan" && <ScanView stratId={stratId} onPickStrategy={pickStrategy} settings={settings} theme={theme} onJournal={journal} />}
         {tab === "watch" && <Watchlist settings={settings} onOpen={(ex, sym, tf) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); setTab("scan"); }} />}
@@ -75,7 +77,7 @@ export default function App() {
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}
         </Suspense></>}
       </main>
-      <footer className="foot dim small">Signal v2.6 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v2.7 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }
