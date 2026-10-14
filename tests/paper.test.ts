@@ -4,7 +4,9 @@ import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { step, settle, tradesThrough, buffer, rulesHash, SPEC, STRATEGY, type State, type Plan, type Trade } from "../src/forward/trader";
 import { paperJob } from "../src/forward/paperJob";
-import { meanCI, maxDdR, scorecard, verdict, tCrit, filterTrades, tradeCounts, parseTradeFilters, tradesCsv } from "../src/forward/paper.js";
+import { meanCI, maxDdR, scorecard, verdict, tCrit, filterTrades, tradeCounts, parseTradeFilters, tradesCsv, today } from "../src/forward/paper.js";
+import { wibDay } from "../src/forward/trader";
+import { wibRange, type Stmt } from "../src/forward/paperJob";
 const H = 3.6e6, M = "BTCUSDT";
 const k = (i: number, o: number, h: number, l: number, c: number) => ({ t: i * H, o, h, l, c, v: 1 });
 const L: Plan = { side: "long", entry: 100, sl: 98, tp: 104, atr: 2, conf: 60 };
@@ -69,13 +71,14 @@ it("job: freeze starts at the latest candle, persists trades + events idempotent
   const c = Array.from({ length: 700 }, (_, i) => { const b = 100 + 10 * Math.sin(i / 15) + i * 0.02; return { t: i * H, o: b, h: b + 1.2, l: b - 1.2, c: b + 0.3 * Math.sin(i), v: 100 + (i % 7) * 30 }; });
   const kl = async (_m: string, n: number) => c.filter((x) => x.t + H <= now).slice(-n); const fu = async () => ({ rows: [], src: "hl-proxy" });
   let now = 600 * H; const log = () => {};
-  const a = await paperJob(q, { now, klines: kl, funding: fu, log }); expect(a.errors).toEqual([]);
+  const tx = async (ss: Stmt[]) => { await db.transaction(async (t) => { for (const x of ss) await t.query(x.text, x.params as any[]); }); };
+  const a = await paperJob(q, { now, klines: kl, funding: fu, log, tx }); expect(a.errors).toEqual([]);
   expect((await q(`select last_t from fwd_trader`)).map((r) => Number(r.last_t))).toEqual([599 * H, 599 * H, 599 * H]);
-  now = 690 * H; const b = await paperJob(q, { now, klines: kl, funding: fu, log }); expect(b.errors).toEqual([]);
+  now = 690 * H; const b = await paperJob(q, { now, klines: kl, funding: fu, log, tx }); expect(b.errors).toEqual([]);
   const tr = await q(`select * from fwd_trades`); const ev = await q(`select * from fwd_events`);
   expect(tr.length).toBeGreaterThan(0); expect(ev.length).toBeGreaterThanOrEqual(tr.length);
   for (const m of SPEC.markets) expect(tr.filter((t) => t.market === m && ["pending", "open"].includes(t.status)).length).toBeLessThanOrEqual(1);
-  const n = (await q(`select count(*)::int n from fwd_events`))[0].n; await paperJob(q, { now, klines: kl, funding: fu, log }); expect((await q(`select count(*)::int n from fwd_events`))[0].n).toBe(n);
+  const n = (await q(`select count(*)::int n from fwd_events`))[0].n; await paperJob(q, { now, klines: kl, funding: fu, log, tx }); expect((await q(`select count(*)::int n from fwd_events`))[0].n).toBe(n);
 });
 it("paper.js constants match the trader", async () => { const p = await import("../src/forward/paper.js"); expect(p.STRATEGY_ID).toBe(STRATEGY); expect(p.RULES_HASH).toBe(rulesHash()); expect(p.MARKETS).toEqual(SPEC.markets); });
 it("daily loss limit: −3R realized in a WIB day cancels the pending order, blocks new ones, keeps the open position, resumes next WIB day", () => {
@@ -90,4 +93,38 @@ it("daily loss limit: −3R realized in a WIB day cancels the pending order, blo
   expect(r.events.map((e) => [e.kind, e.data.why])).toEqual([["limit", undefined], ["cancel", "daily limit"]]);
   const open = step({ order: null, pos: st.pos, day: { key: "2026-10-15", r: -3.5, hit: true } }, kk(3, 101, 107, 100.5, 106), [L], M); expect(open.closed[0].exit_reason).toBe("tp"); expect(open.state.order).toBeNull();
   r = step(r.state, kk(24, 101, 102, 100.5, 101), [L], M); expect(r.state.day!.key).toBe("2026-10-16"); expect(r.events.map((e) => e.kind)).toEqual(["place"]);
+});
+
+const mkDb = () => { const db = new PGlite(); const q = async (t: string, p?: unknown[]) => (await db.query(t, p as any[])).rows as any[];
+  const tx = async (ss: Stmt[]) => { await db.transaction(async (t) => { for (const x of ss) await t.query(x.text, x.params as any[]); }); }; return { db, q, tx }; };
+const series = Array.from({ length: 700 }, (_, i) => { const b = 100 + 10 * Math.sin(i / 15) + i * 0.02; return { t: i * H, o: b, h: b + 1.2, l: b - 1.2, c: b + 0.3 * Math.sin(i), v: 100 + (i % 7) * 30 }; });
+const klAt = (now: number) => async (_m: string, n: number) => series.filter((x) => x.t + H <= now).slice(-n);
+const fu0 = async () => ({ rows: [], src: "hl-proxy" }); const quiet = () => {};
+const dump = async (q: any) => ({ tr: (await q(`select key, status, placed_t, fill_t, exit_t, bars, replaced, r_net from fwd_trades order by key`)), ev: (await q(`select market, kind, t, trade_key from fwd_events order by market, t, kind, trade_key`)), cur: (await q(`select market, last_t from fwd_trader order by market`)) });
+it("WIB day is one half-open rule [00:00, next 00:00): trader, job restore and page agree at the 00:00 WIB candle close", async () => {
+  const mid = Date.parse("2026-10-15T00:00:00+07:00");
+  expect(wibDay(mid)).toBe("2026-10-15"); expect(wibDay(mid - 1)).toBe("2026-10-14"); expect(wibRange("2026-10-15")).toEqual([mid, mid + 864e5]);
+  // page: a close + limit at exactly 00:00 WIB counts for the new day, not the old one
+  const T = [{ market: M, status: "closed", exit_t: mid, r_net: -3.1 }]; const lim = [{ market: M, t: mid }];
+  expect(today(T, lim, mid + 5 * H)[M]).toMatchObject({ r: -3.1, hit: true }); expect(today(T, lim, mid - H)[M]).toMatchObject({ r: 0, hit: false });
+  // job: a limit stored at 00:00 WIB is restored on the next run, so the coin stays paused that day
+  const { q, tx } = mkDb(); const base = Math.floor(mid / H) - 600; const ser = series.map((x, i) => ({ ...x, t: (base + i) * H }));
+  const kl = (now: number) => async (_m: string, n: number) => ser.filter((x) => x.t + H <= now).slice(-n);
+  await paperJob(q, { now: mid, klines: kl(mid), funding: fu0, log: quiet, tx }); // freeze: cursor on the candle closing at 00:00 WIB
+  await q(`insert into fwd_events (strategy, market, kind, t, data) values ($1,$2,'limit',$3,'{}')`, [STRATEGY, M, mid]);
+  await paperJob(q, { now: mid + 6 * H, klines: kl(mid + 6 * H), funding: fu0, log: quiet, tx });
+  const ev = await q(`select kind from fwd_events where market=$1 and t > $2`, [M, mid]); expect(ev.filter((e) => e.kind === "place")).toEqual([]);
+});
+it("job: a crash midway through a coin's run leaves no half-written candle, and the rerun gives exactly the same rows as a clean run (no double count or fill)", async () => {
+  const clean = mkDb(); let now = 600 * H; await paperJob(clean.q, { now, klines: klAt(now), funding: fu0, log: quiet, tx: clean.tx });
+  now = 690 * H; await paperJob(clean.q, { now, klines: klAt(now), funding: fu0, log: quiet, tx: clean.tx }); const want = await dump(clean.q);
+  expect(want.ev.filter((e: any) => e.kind === "fill").length).toBeGreaterThan(0);
+  const c = mkDb(); now = 600 * H; await paperJob(c.q, { now, klines: klAt(now), funding: fu0, log: quiet, tx: c.tx });
+  // crash after 40 candle writes, mid-transaction: the statements run, then the network dies before commit
+  let n = 0; const crashy = async (ss: Stmt[]) => { if (++n > 40) await c.db.transaction(async (t) => { await t.query(ss[0].text, ss[0].params as any[]); throw new Error("ECONNRESET"); }); else await c.tx(ss); };
+  now = 690 * H; const a = await paperJob(c.q, { now, klines: klAt(now), funding: fu0, log: quiet, tx: crashy }); expect(a.errors.length).toBe(3);
+  const mid = await dump(c.q); expect(mid.cur.every((r: any) => Number(r.last_t) < 689 * H)).toBe(true);
+  await paperJob(c.q, { now, klines: klAt(now), funding: fu0, log: quiet, tx: c.tx }); const got = await dump(c.q);
+  expect(got.cur).toEqual(want.cur); expect(got.ev).toEqual(want.ev); expect(got.tr.map(({ r_net, ...x }: any) => x)).toEqual(want.tr.map(({ r_net, ...x }: any) => x));
+  got.tr.forEach((t: any, i: number) => expect(t.r_net ?? 0).toBeCloseTo(want.tr[i].r_net ?? 0, 9));
 });

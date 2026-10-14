@@ -56,7 +56,7 @@ export function tradesCsv(T) {
 export const STRATEGY_ID = "bn-1h-z2-v1", STRATEGY_NAME = "Binance 1H Zone 2", RULES_HASH = "b81ceeeb", MARKETS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
 /** Today's realized R and daily-limit status per market (WIB day). */
 export function today(T, limits, now = Date.now()) {
-  const key = new Date(now + 7 * 3.6e6).toISOString().slice(0, 10); const d0 = Date.parse(key + "T00:00:00+07:00"); const inDay = (t) => t != null && Number(t) > d0 && Number(t) <= d0 + 864e5;
+  const key = new Date(now + 7 * 3.6e6).toISOString().slice(0, 10); const d0 = Date.parse(key + "T00:00:00+07:00"); const inDay = (t) => t != null && Number(t) >= d0 && Number(t) < d0 + 864e5 // half-open [00:00, next 00:00) WIB, same as the trader;
   return Object.fromEntries(MARKETS.map((m) => { const r = T.filter((t) => t.market === m && t.status === "closed" && inDay(t.exit_t)).reduce((a, t) => a + Number(t.r_net), 0);
     return [m, { r, hit: limits.some((e) => e.market === m && inDay(e.t)), limit: DAILY_LIMIT_R }]; }));
 }

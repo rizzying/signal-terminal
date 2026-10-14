@@ -27,7 +27,7 @@
 - **One signal = one trade.** Cancelled and expired orders are **no trade**: they count only in the fill rate.
 
 ## Daily loss limit (pause, not a kill)
-- Per virtual trader (market), realized R is summed over the **WIB calendar day** (00:00–24:00, UTC+7), by exit time.
+- Per virtual trader (market), realized R is summed over the **WIB calendar day** (half-open: from 00:00 up to but not including the next 00:00, UTC+7), by exit time. A candle closing at exactly 00:00 WIB belongs to the new day (clarified in v3.1.1; matches the trader, no rule change).
 - When it reaches **−3R or worse**: the pending order is cancelled, no new orders are placed for the rest of that WIB day, and a `daily limit hit` event is logged. **Open positions keep running** to their stop or target. Trading resumes at the next 00:00 WIB.
 
 ## Fills and exits (honest)
