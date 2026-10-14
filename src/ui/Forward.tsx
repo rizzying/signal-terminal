@@ -1,63 +1,90 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LATEST, VERSIONS, VERSION_LABEL } from "../forward/version.js";
-import { by, DIM_LABEL, rates, SMALL, type Dim, type Rates, type Row } from "../forward/stats";
-type Data = { configured: boolean; error?: string; lastRun?: { at: string; inserted: number; resolved: number } | null; groups?: Row[]; recent?: any[]; span?: { venue: string; first: number; candles: number }[]; versions?: { version: string; n: number }[] };
-type View = "all" | "hyperliquid" | "bulk" | "compare";
+import { progress, SMALL_N } from "../forward/view.js";
+import { topOfBook } from "../api/markets";
+import { fmt } from "../engine/scan";
+import { useVisibleInterval } from "./useVisibleInterval";
+
+type Score = { n: number; waiting: number; running: number; win: number; loss: number; expired: number; resolved: number; filled: number; winRate: number | null; avgR: number | null; expiredPct: number | null; small: boolean };
+type Z = { zone: number; entry_bottom: number; entry_top: number; sl: number; tp1: number; tp2: number; rr: number; status: string; outcome: string; rNet: number | null; bars: number | null };
+type SetupCard = { venue: string; symbol: string; tf: string; side: "long" | "short"; candle_t: number; close_t: number; version: string; conf_band: string; conf_pct: number; px: number | null; atr: number | null; zones: Z[] };
+type Data = { configured: boolean; error?: string; lastRun?: { at: string } | null; versions?: { version: string; n: number }[]; hidden?: number; total?: number; score?: Score; by?: Record<string, ({ key: string } & Score)[]>; setups?: SetupCard[]; facets?: { venue: string[]; symbol: string[]; tf: string[] } };
 const VN: Record<string, string> = { hyperliquid: "Hyperliquid", bulk: "Bulk" };
-const p = (x: number | null) => (x == null ? "–" : `${Math.round(x)}%`);
-const ST: Record<string, string> = { pending: "waiting", expired: "not filled", open: "filled, running", tp1_open: "TP1 hit, running", tp1: "TP1 then stop", tp2: "TP2", sl: "stop" };
+const OUT: Record<string, string> = { waiting: "waiting to fill", running: "filled, running", win: "TP1 hit", loss: "stopped", expired: "not filled (expired)" };
 const wib = (t: number | string) => new Date(t).toLocaleString("en-GB", { timeZone: "Asia/Jakarta", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }) + " WIB";
-function Small({ r, bulk }: { r: Rates; bulk?: boolean }) { return r.withResult < SMALL || bulk ? <span className="badge" title={`Only ${r.withResult} filled trades with a result so far`}>small sample</span> : null; }
-function Cells({ r }: { r: Rates }) {
-  return <><td data-label="Setups" className="num">{r.n}</td><td data-label="Filled" className="num">{p(r.fillRate)}<small className="dim"> of {r.filled + r.expired}</small></td>
-    <td data-label="TP1" className="num pos">{p(r.tp1Rate)}</td><td data-label="TP2" className="num pos">{p(r.tp2Rate)}</td><td data-label="Stop" className="num neg">{p(r.slRate)}</td><td data-label="With result" className="num">{r.withResult}</td></>;
+const pct = (x: number) => `${Math.round(x * 100)}%`;
+/** Never a bare % on a small sample: "3 of 7 · small sample". */
+export function rateText(k: number, n: number) { if (!n) return "–"; return n < SMALL_N ? `${k} of ${n} · small sample` : `${pct(k / n)} (${k}/${n})`; }
+const rText = (s: Score) => (s.avgR == null ? "–" : `${s.avgR >= 0 ? "+" : ""}${s.avgR.toFixed(2)}R${s.small ? ` · n=${s.resolved}, small sample` : ""}`);
+const F_KEYS = ["venue", "symbol", "tf", "side", "zone", "status", "from", "to"] as const;
+type Filters = Partial<Record<(typeof F_KEYS)[number], string>>;
+const qs = (v: string, f: Filters) => new URLSearchParams({ v, ...Object.fromEntries(Object.entries(f).filter(([, x]) => x)) }).toString();
+
+function Board({ s }: { s: Score }) {
+  const items: [string, string][] = [["Resolved", String(s.resolved)], ["Waiting to fill", String(s.waiting)], ["Running", String(s.running)], ["Win rate (TP1 vs stop)", rateText(s.win, s.resolved)], ["Average R, after fees", rText(s)], ["Expired / no fill", rateText(s.expired, s.filled + s.expired)]];
+  return <div className="statrow">{items.map(([k, v]) => <div key={k} className="card stat"><span className="lbl">{k}</span><b className="mono">{v}</b></div>)}</div>;
 }
-function Table({ rows, dim, bulkSmall }: { rows: Row[]; dim: Dim; bulkSmall: boolean }) {
-  const g = by(rows, dim); if (!g.length) return null;
-  return <div className="card"><h3>By {DIM_LABEL[dim].toLowerCase()}</h3><table className="rt"><thead><tr><th>{DIM_LABEL[dim]}</th><th>Setups</th><th>Filled</th><th>TP1</th><th>TP2</th><th>Stop</th><th>With result</th></tr></thead>
-    <tbody>{g.map(({ key, r }) => <tr key={key}><td data-label={DIM_LABEL[dim]}><b>{dim === "zone" ? `Zone ${key}` : dim === "tf" ? key.toUpperCase() : key}</b> <Small r={r} bulk={bulkSmall} /></td><Cells r={r} /></tr>)}</tbody></table></div>;
+function Breakdown({ name, rows }: { name: string; rows: ({ key: string } & Score)[] }) {
+  if (!rows?.length) return null;
+  return <div className="card"><h3>By {name}</h3><table className="rt"><thead><tr><th>{name}</th><th>Setups</th><th>Resolved</th><th>Win rate</th><th>Avg R</th><th>Expired</th></tr></thead>
+    <tbody>{rows.map((r) => <tr key={r.key}><td data-label={name}><b>{VN[r.key] ?? (name === "timeframe" ? r.key.toUpperCase() : r.key)}</b>{r.small && <span className="badge" title={`Only ${r.resolved} resolved`}>small sample</span>}</td>
+      <td data-label="Setups" className="num">{r.n}</td><td data-label="Resolved" className="num">{r.resolved}</td><td data-label="Win rate" className="num">{rateText(r.win, r.resolved)}</td>
+      <td data-label="Avg R" className="num">{r.avgR == null ? "–" : r.avgR.toFixed(2)}</td><td data-label="Expired" className="num">{rateText(r.expired, r.filled + r.expired)}</td></tr>)}</tbody></table></div>;
 }
-function Compare({ rows, dim }: { rows: Row[]; dim: Dim }) {
-  const hl = by(rows.filter((r) => r.venue === "hyperliquid"), dim), bk = by(rows.filter((r) => r.venue === "bulk"), dim);
-  const keys = [...new Set([...hl, ...bk].map((x) => x.key))]; if (!keys.length) return null; const f = (xs: typeof hl, k: string) => xs.find((x) => x.key === k)?.r;
-  const cell = (r?: Rates) => (r ? `${p(r.tp1Rate)} / ${p(r.slRate)}` : "–");
-  return <div className="card"><h3>By {DIM_LABEL[dim].toLowerCase()}: Hyperliquid vs Bulk</h3><p className="dim small">Each cell: TP1 rate / stop rate, then fill rate and trades with a result.</p>
-    <table className="rt"><thead><tr><th>{DIM_LABEL[dim]}</th><th>Hyperliquid</th><th>Bulk</th></tr></thead>
-    <tbody>{keys.map((k) => { const a = f(hl, k), b = f(bk, k); return <tr key={k}><td data-label={DIM_LABEL[dim]}><b>{dim === "zone" ? `Zone ${k}` : dim === "tf" ? k.toUpperCase() : k}</b></td>
-      <td data-label="Hyperliquid" className="num">{cell(a)}<small className="dim"> · fill {p(a?.fillRate ?? null)} · n={a?.withResult ?? 0}</small></td>
-      <td data-label="Bulk" className="num">{cell(b)}<small className="dim"> · fill {p(b?.fillRate ?? null)} · n={b?.withResult ?? 0}</small></td></tr>; })}</tbody></table></div>;
+function Card({ s, px, prevPx, now }: { s: SetupCard; px?: number; prevPx?: number; now: number }) {
+  return <article className="card fsetup">
+    <div className="cardhead"><h3>{VN[s.venue]} {s.symbol} · {s.tf.toUpperCase()} <span className={`badge ${s.side}`}>{s.side}</span></h3><span className="lbl">{wib(s.close_t)} · {s.conf_band} {s.conf_pct}% · {s.version}</span></div>
+    <div className="fzones">{s.zones.map((z) => { const p = z.outcome === "waiting" && px ? progress(z, s, px, now, s.px ?? prevPx) : null;
+      return <div key={z.zone} className={`fzone ${z.outcome}`}>
+        <div className="row between"><b>Z{z.zone}</b><span className={`badge ${z.outcome === "win" ? "long" : z.outcome === "loss" ? "short" : ""}`}>{OUT[z.outcome]}</span></div>
+        <dl className="kv"><span>Entry</span><b>{fmt(z.entry_bottom)}–{fmt(z.entry_top)}</b><span>Stop</span><b className="neg">{fmt(z.sl)}</b><span>TP1 / TP2</span><b className="pos">{fmt(z.tp1)} / {fmt(z.tp2)}</b>
+          <span>R:R</span><b>{z.rr.toFixed(1)}R{z.rNet != null ? ` · result ${z.rNet >= 0 ? "+" : ""}${z.rNet.toFixed(2)}R` : ""}</b></dl>
+        {p && <p className="small mono">{p.inside ? "Price is in the zone now" : `${(p.gapPct * 100).toFixed(2)}% away${p.gapAtr != null ? ` (${p.gapAtr.toFixed(1)} ATR)` : ""}`}{p.trend && !p.inside ? ` · ${p.trend}` : ""} · {p.barsLeft} bars left</p>}
+      </div>; })}</div>
+  </article>;
 }
 export function ForwardView() {
-  const [d, setD] = useState<Data | null>(null); const [err, setErr] = useState(""); const [view, setView] = useState<View>("all"); const [ver, setVer] = useState<string>(LATEST);
-  useEffect(() => { setD(null); fetch(`/api/forward?v=${ver}`).then((r) => r.json()).then(setD).catch(() => setErr("Couldn't load the forward test right now.")); }, [ver]);
+  const [ver, setVer] = useState<string>(LATEST); const [f, setF] = useState<Filters>({}); const [d, setD] = useState<Data | null>(null); const [err, setErr] = useState("");
+  useEffect(() => { let live = true; setErr(""); fetch(`/api/forward?${qs(ver, f)}`).then((r) => r.json()).then((x) => live && setD(x)).catch(() => live && setErr("Couldn't load the forward test right now.")); return () => { live = false; }; }, [ver, f]);
+  // live prices for setups still waiting to fill: Hyperliquid mids in one call, Bulk book mids for up to 8 symbols
+  const [px, setPx] = useState<Record<string, number>>({}); const prev = useRef<Record<string, number>>({}); const [now, setNow] = useState(Date.now());
+  const waiting = useMemo(() => (d?.setups ?? []).filter((s) => s.zones.some((z) => z.outcome === "waiting")), [d]);
+  const poll = async () => { if (!waiting.length) return; const out: Record<string, number> = {};
+    if (waiting.some((s) => s.venue === "hyperliquid")) try { const m = await (await fetch("https://api.hyperliquid.xyz/info", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "allMids" }) })).json(); for (const s of waiting) if (s.venue === "hyperliquid" && m[s.symbol]) out[`hyperliquid|${s.symbol}`] = +m[s.symbol]; } catch { /* offline */ }
+    for (const sym of [...new Set(waiting.filter((s) => s.venue === "bulk").map((s) => s.symbol))].slice(0, 8)) try { const b = await topOfBook("bulk", sym); out[`bulk|${sym}`] = (b.bid + b.ask) / 2; } catch { /* skip */ }
+    setPx((p) => { prev.current = p; return { ...p, ...out }; }); setNow(Date.now()); };
+  useEffect(() => { poll(); }, [waiting]);
+  useVisibleInterval(() => { poll(); }, 15_000, [waiting]);
   if (err) return <section className="card"><p className="alert">{err}</p></section>;
   if (!d) return <section className="card"><p className="dim" role="status">Loading…</p></section>;
   if (!d.configured || d.error) return <section className="card stack"><h2>Forward test</h2><p className="dim">{d.error ?? "The forward test is being set up. Results will appear here after the first hourly run."}</p></section>;
-  const all = d.groups ?? []; const rows = view === "all" || view === "compare" ? all : all.filter((r) => r.venue === view);
-  const tot = rates(rows); const bulkSmall = view === "bulk" && tot.withResult < 100;
-  const bulkSpan = d.span?.find((s) => s.venue === "bulk");
+  const s = d.score!; const set = (k: keyof Filters, v: string) => setF((x) => ({ ...x, [k]: v || undefined }));
+  const sel = (k: keyof Filters, label: string, opts: [string, string][]) => <label className="fsel"><span className="lbl">{label}</span><select className="input" value={f[k] ?? ""} onChange={(e) => set(k, e.target.value)}><option value="">All</option>{opts.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label>;
+  const fc = d.facets ?? { venue: [], symbol: [], tf: [] };
   return (
     <section className="stack rise forward">
       <div className="card stack">
-        <div className="cardhead"><h2>Forward test</h2><span className="row gap"><span className="badge">live · still growing</span><a className="btn sm" href={`/api/forward?format=csv&v=${ver}`} download>Export CSV</a></span></div>
-        <p className="small">Every hour, Signal checks BTC, ETH and SOL on 1H and 4H, on Hyperliquid and on Bulk. When the default strategy finds a setup, it saves all 3 zones and never changes them. Then it watches what price does next.</p>
-        <p className="dim small"><b>Filled</b> = price reached the entry zone within 24 candles. <b>TP1 / TP2 / Stop</b> = what was hit first after filling (if a stop and a target fall in the same candle, it counts as a stop). Only finished candles are used. This is real, unseen data, but it's still young: small numbers can change a lot. Not financial advice.</p>
-        {d.lastRun && <p className="dim small">Last update {wib(d.lastRun.at)}.{bulkSpan ? ` Bulk feed since ${wib(Number(bulkSpan.first))}.` : ""}</p>}
+        <div className="cardhead"><h2>Forward test</h2><span className="row gap"><span className="badge">live · still growing</span><a className="btn sm" href={`/api/forward?format=csv&${qs(ver, f)}`} download>Export CSV</a></span></div>
+        <p className="small">Every hour, Signal scans every Bulk market that is trading (and the same coin on Hyperliquid) on 15m, 1H, 4H and 1D. When the default strategy finds a setup, it saves all 3 zones once and never edits them, then watches what price does next.</p>
+        <p className="dim small"><b>Win</b> = TP1 reached after filling (all-in on TP1). <b>Loss</b> = stop first (a stop and a target in the same candle counts as a stop). <b>Expired</b> = price never reached the zone within 24 candles. Average R is after taker fees on both sides. Only finished candles are used. Real, unseen data, but young: small numbers swing a lot. Not financial advice.</p>
         <div className="row gap wrap"><label className="lbl" htmlFor="fwd-ver">Rules version</label>
-          <select id="fwd-ver" className="input" value={ver} onChange={(e) => setVer(e.target.value)}>{[...VERSIONS, "all"].map((v) => { const n = v === "all" ? d.versions?.reduce((a, x) => a + x.n, 0) : d.versions?.find((x) => x.version === v)?.n; return <option key={v} value={v}>{(VERSION_LABEL as Record<string, string>)[v]}{n != null ? ` (${n})` : " (0)"}</option>; })}</select>
-          <span className="dim small">v1 = original zones · v2 = zones capped at 3.5 ATR (from 14 Oct 09:02 WIB) · v3 = same as v2, each setup logged once until it changes or ends.</span></div>
-        {!all.length && <p className="note small">No setups recorded under {(VERSION_LABEL as Record<string, string>)[ver]} yet. They appear after the next hourly run.</p>}
-        <div className="seg" role="tablist" aria-label="Venue">{(["all", "hyperliquid", "bulk", "compare"] as View[]).map((v) => <button key={v} role="tab" aria-selected={view === v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{v === "all" ? "All" : v === "compare" ? "Side by side" : VN[v]}</button>)}</div>
-        {view === "bulk" && <p className="note small">Bulk's history is short, so its sample is small. Give it a few weeks before reading much into it.</p>}
+          <select id="fwd-ver" className="input" value={ver} onChange={(e) => setVer(e.target.value)}>{[...VERSIONS, "all"].map((v) => { const n = v === "all" ? d.versions?.reduce((a, x) => a + x.n, 0) : d.versions?.find((x) => x.version === v)?.n; return <option key={v} value={v}>{(VERSION_LABEL as Record<string, string>)[v]} ({n ?? 0})</option>; })}</select>
+          {d.lastRun && <span className="dim small">Last update {wib(d.lastRun.at)}.</span>}</div>
+        <div className="ffilters">
+          {sel("venue", "Venue", fc.venue.map((v) => [v, VN[v] ?? v]))}{sel("symbol", "Coin", fc.symbol.map((v) => [v, v]))}{sel("tf", "Timeframe", fc.tf.map((v) => [v, v.toUpperCase()]))}
+          {sel("side", "Side", [["long", "Long"], ["short", "Short"]])}{sel("zone", "Zone", [["1", "Z1"], ["2", "Z2"], ["3", "Z3"]])}{sel("status", "Status", Object.entries(OUT))}
+          <label className="fsel"><span className="lbl">From</span><input className="input" type="date" value={f.from ?? ""} onChange={(e) => set("from", e.target.value)} /></label>
+          <label className="fsel"><span className="lbl">To</span><input className="input" type="date" value={f.to ?? ""} onChange={(e) => set("to", e.target.value)} /></label>
+          {Object.values(f).some(Boolean) && <button className="btn ghost sm" onClick={() => setF({})}>Clear filters</button>}
+        </div>
+        {!!d.hidden && <p className="dim small">{d.hidden} repeated row{d.hidden === 1 ? "" : "s"} (same setup logged again while still open) hidden from stats, cards and CSV. Nothing is deleted.</p>}
       </div>
-      {view !== "compare" && <div className="statrow">
-        {[["Setups saved", String(tot.n)], ["Filled", p(tot.fillRate)], ["Reached TP1", p(tot.tp1Rate)], ["Reached TP2", p(tot.tp2Rate)], ["Stopped", p(tot.slRate)]].map(([k, v]) => <div key={k} className="card stat"><span className="lbl">{k}</span><b className="mono">{v}</b></div>)}
-        <p className="dim small">{tot.withResult} filled trades with a result, {tot.open} still running, {tot.pending} waiting to fill.{tot.withResult < SMALL ? " Small sample: treat these rates as rough." : ""}</p>
-      </div>}
-      {(["zone", "tf", "symbol", "conf_band"] as Dim[]).map((dim) => (view === "compare" ? <Compare key={dim} rows={all} dim={dim} /> : <Table key={dim} rows={rows} dim={dim} bulkSmall={bulkSmall} />))}
-      {!!d.recent?.length && view !== "compare" && <div className="card"><h3>Latest setups</h3><table className="rt"><thead><tr><th>When</th><th>Setup</th><th>Entry</th><th>Status</th></tr></thead>
-        <tbody>{d.recent.filter((r) => view === "all" || r.venue === view).map((r, i) => <tr key={i}><td data-label="When">{wib(Number(r.close_t))}</td><td data-label="Setup">{VN[r.venue]} {r.symbol} {r.tf.toUpperCase()} <span className={`badge ${r.side}`}>{r.side}</span> Z{r.zone} · {r.conf_band}</td>
-          <td data-label="Entry" className="num">{(+r.entry_bottom).toPrecision(6)}–{(+r.entry_top).toPrecision(6)}</td><td data-label="Status">{ST[r.status] ?? r.status}</td></tr>)}</tbody></table></div>}
+      {!d.total ? <p className="note">No setups match{ver !== "all" ? ` under ${(VERSION_LABEL as Record<string, string>)[ver]}` : ""} yet. New ones appear after the next hourly run.</p> : <>
+        <Board s={s} />
+        <div className="fbreak">{([["zone", "zone"], ["tf", "timeframe"], ["venue", "venue"], ["side", "side"], ["symbol", "coin"]] as const).map(([k, n]) => <Breakdown key={k} name={n} rows={d.by?.[k] ?? []} />)}</div>
+        <h3>Latest setups <span className="dim small">({Math.min(40, d.setups?.length ?? 0)} newest)</span></h3>
+        <div className="fcards">{d.setups!.map((x) => <Card key={`${x.venue}|${x.symbol}|${x.tf}|${x.side}|${x.candle_t}`} s={x} px={px[`${x.venue}|${x.symbol}`]} prevPx={prev.current[`${x.venue}|${x.symbol}`]} now={now} />)}</div>
+      </>}
     </section>
   );
 }

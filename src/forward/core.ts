@@ -11,7 +11,12 @@ export const FWD_VENUES: Venue[] = ["hyperliquid", "bulk"];
 export const FWD_SYMBOLS = ["BTC", "ETH", "SOL"] as const;
 /** Venue symbol for a base asset. */
 export const venueSym = (v: Venue, base: string) => (v === "bulk" ? `${base}-USD` : base);
-export const FWD_TFS: TF[] = ["1h", "4h"];
+export const FWD_TFS: TF[] = ["15m", "1h", "4h", "1d"];
+/** v4 feed set: every TRADING Bulk market, plus the same base on Hyperliquid when it is listed there. Falls back to BTC/ETH/SOL. */
+export function fwdFeeds(bulk: { symbol: string }[], hl: { symbol: string }[]): { venue: Venue; symbol: string }[] {
+  const bases = bulk.map((m) => m.symbol.replace(/-USD$/, "")).filter(Boolean); const B = bases.length ? bases : [...FWD_SYMBOLS]; const H = new Set(hl.map((m) => m.symbol));
+  return [...B.filter((b) => !hl.length ? (FWD_SYMBOLS as readonly string[]).includes(b) : H.has(b)).map((b) => ({ venue: "hyperliquid" as Venue, symbol: b })), ...B.map((b) => ({ venue: "bulk" as Venue, symbol: `${b}-USD` }))];
+}
 export const WINDOW = 400; // candles fed to the scan, same as the app
 export const FILL_BARS = 24;
 /** Today's "Signal default" strategy (same as BUILTINS[0].settings). */
@@ -22,7 +27,7 @@ export function settingsHash(s: Settings): string {
   let h = 0x811c9dc5; for (const ch of JSON.stringify(norm(s))) { h ^= ch.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return "v1-" + h.toString(16).padStart(8, "0");
 }
 export type Snap = { key: string; venue: Venue; candle_t: number; close_t: number; symbol: string; tf: TF; side: "long" | "short"; conf_band: string; conf_pct: number; others_agree: number; others_total: number; structure_ok: boolean;
-  signals: string[]; zone: number; entry_top: number; entry_bottom: number; entry_mid: number; sl: number; tp1: number; tp2: number; settings_hash: string; atr: number; rules: string };
+  signals: string[]; zone: number; entry_top: number; entry_bottom: number; entry_mid: number; sl: number; tp1: number; tp2: number; settings_hash: string; atr: number; rules: string; px: number };
 export const closedOnly = (c: Candle[], tf: TF, now = Date.now()) => c.filter((k) => k.t + TF_MS[tf] <= now);
 /** Setups that pass the default rule on the candle at index i (closed candles only). */
 export function snapshotsAt(c: Candle[], i: number, symbol: string, tf: TF, o: { venue?: Venue; settings?: Settings; maxLev?: number; tick?: number } = {}): Snap[] {
@@ -34,19 +39,21 @@ export function snapshotsAt(c: Candle[], i: number, symbol: string, tf: TF, o: {
     if (!st.shown) continue; if (o.tick) st = roundSetup(st, (p, m) => roundTick(p, o.tick, m));
     const t = win.at(-1)!.t; atr ??= analyze(win, s, o.maxLev, mmrFor(venue, o.maxLev)).atr;
     st.zones.forEach((z) => out.push({ key: `${venue}|${symbol}|${tf}|${t}|${side}|${z.rank}|${hash}`, venue, candle_t: t, close_t: t + TF_MS[tf], symbol, tf, side, conf_band: st.band, conf_pct: st.confidence, others_agree: st.othersAgree, others_total: st.othersTotal, structure_ok: st.structureOk,
-      signals: st.signals.filter((g) => g.pass && g.weight > 0).map((g) => g.key), zone: z.rank, entry_top: z.top, entry_bottom: z.bottom, entry_mid: z.entry, sl: z.stop, tp1: z.t1, tp2: z.t2, settings_hash: hash, atr: atr!, rules: RULES }));
+      signals: st.signals.filter((g) => g.pass && g.weight > 0).map((g) => g.key), zone: z.rank, entry_top: z.top, entry_bottom: z.bottom, entry_mid: z.entry, sl: z.stop, tp1: z.t1, tp2: z.t2, settings_hash: hash, atr: atr!, rules: RULES, px: win.at(-1)!.c }));
   }
   return out;
 }
 /** Rules version written on new snapshots (see version.js). */
-export const RULES = "v3";
-/** A new snapshot repeats the previous one for its key when entry midpoint and stop each moved ≤ this × ATR. */
+export const RULES = "v4";
+/** A new snapshot repeats the previous one for its key when both entry-zone edges moved ≤ this × ATR (v4: the stop is ignored,
+ *  because it is zone edge ± 1.5 ATR and drifts every candle as ATR changes; that drift caused v3 repeat rows). */
 export const DEDUPE_ATR = 0.25;
-export function isRepeat(prev: { entry_mid: number; sl: number; status: string | null; candle_t?: number } | undefined, s: { entry_mid: number; sl: number; atr: number; candle_t?: number; tf?: TF }): boolean {
+type Lv = { entry_top: number; entry_bottom: number };
+export function isRepeat(prev: (Lv & { status: string | null; candle_t?: number }) | undefined, s: Lv & { atr: number; candle_t?: number; tf?: TF }): boolean {
   if (!prev || (prev.status != null && FINAL.includes(prev.status as Status))) return false;
   // not resolved yet (e.g. inserted earlier in the same catch-up run) but already past the fill window → it expired
   if ((prev.status == null || prev.status === "pending") && prev.candle_t != null && s.candle_t != null && s.tf && s.candle_t - prev.candle_t >= FILL_BARS * TF_MS[s.tf]) return false;
-  const tol = DEDUPE_ATR * s.atr; return Math.abs(s.entry_mid - prev.entry_mid) <= tol && Math.abs(s.sl - prev.sl) <= tol;
+  const tol = DEDUPE_ATR * s.atr; return Math.abs(s.entry_top - prev.entry_top) <= tol && Math.abs(s.entry_bottom - prev.entry_bottom) <= tol;
 }
 export type Status = "pending" | "expired" | "open" | "tp1_open" | "tp1" | "tp2" | "sl";
 export const FINAL: Status[] = ["expired", "tp1", "tp2", "sl"];
