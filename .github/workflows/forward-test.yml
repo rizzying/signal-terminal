@@ -9,12 +9,12 @@ concurrency: { group: forward-test, cancel-in-progress: false }
 permissions: { contents: read }
 jobs:
   run:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm }
       - run: npm ci --no-audit --no-fund
       - run: npx tsx scripts/forward.ts
         env:
