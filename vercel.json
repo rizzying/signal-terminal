@@ -21,7 +21,7 @@
     },
     {
      "key": "Content-Security-Policy",
-     "value": "default-src 'self'; script-src 'self' 'sha256-j2RV/yS2KqN55+n381ZvyAMRj+yYXrSW4paJpk4kO0k='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss://api.hyperliquid.xyz https://api.hyperliquid.xyz https://mainnet-api1.bulk.trade https://data-api.binance.vision https://www.okx.com https://api.gateio.ws https://api.bitget.com https://indexer.dydx.trade https://www.deribit.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self'; manifest-src 'self'"
+     "value": "default-src 'self'; script-src 'self' 'sha256-j2RV/yS2KqN55+n381ZvyAMRj+yYXrSW4paJpk4kO0k='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss://api.hyperliquid.xyz wss://mainnet-ws1.bulk.trade https://api.hyperliquid.xyz https://mainnet-api1.bulk.trade https://data-api.binance.vision https://www.okx.com https://api.gateio.ws https://api.bitget.com https://indexer.dydx.trade https://www.deribit.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self'; manifest-src 'self'"
     }
    ]
   }
