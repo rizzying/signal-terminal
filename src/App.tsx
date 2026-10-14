@@ -3,11 +3,11 @@ import { DEFAULTS, sanitize, type Settings } from "./engine/settings";
 import { db, uid, type Trade } from "./journal/db";
 import type { Draft } from "./ui/Scan";
 import { useAlertWatcher } from "./ui/Alerts";
-import { useLabs, getLabs } from "./labs";
+import { useLabs, labAllowed } from "./labs";
 import { activeId, setActiveId, type Strategy } from "./strategies";
 
 type Tab = "forward" | "today" | "scan" | "market" | "watch" | "backtest" | "calendar" | "wallets" | "journal" | "settings";
-const ALL_TABS: { id: Tab; name: string; more?: boolean; labs?: boolean }[] = [{ id: "today", name: "Today" }, { id: "scan", name: "Scan" }, { id: "market", name: "Market" }, { id: "watch", name: "Watchlist" }, { id: "forward", name: "Forward test", more: true }, { id: "backtest", name: "Backtest", more: true, labs: true }, { id: "calendar", name: "Calendar", more: true }, { id: "wallets", name: "Wallets", more: true }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings", more: true }];
+const ALL_TABS: { id: Tab; name: string; more?: boolean; labs?: boolean }[] = [{ id: "today", name: "Today" }, { id: "scan", name: "Scan" }, { id: "market", name: "Market" }, { id: "watch", name: "Watchlist" }, { id: "forward", name: "Forward test", more: true, labs: true }, { id: "backtest", name: "Backtest", more: true, labs: true }, { id: "calendar", name: "Calendar", more: true }, { id: "wallets", name: "Wallets", more: true }, { id: "journal", name: "Journal" }, { id: "settings", name: "Settings", more: true }];
 const Watchlist = lazy(() => import("./ui/Watchlist").then((m) => ({ default: m.Watchlist })));
 const Wallets = lazy(() => import("./ui/Wallets").then((m) => ({ default: m.Wallets })));
 const MarketView = lazy(() => import("./ui/Market").then((m) => ({ default: m.MarketView })));
@@ -21,8 +21,8 @@ const TodayView = lazy(() => import("./ui/Today").then((m) => ({ default: m.Toda
 export default function App() {
   useAlertWatcher();
   const [more, setMore] = useState(false);
-  const labs = useLabs(); const TABS = ALL_TABS.filter((t) => t.id !== "backtest" || labs.backtest);
-  const [tab, setTab] = useState<Tab>(() => { const h = location.hash.slice(1) as Tab; return h === "backtest" && !getLabs().backtest ? "scan" : h || "today"; });
+  const labs = useLabs(); const TABS = ALL_TABS.filter((t) => labAllowed(t.id, labs));
+  const [tab, setTab] = useState<Tab>(() => { const h = location.hash.slice(1) as Tab; return h || "today"; });
   useEffect(() => { if (tab === "backtest" && !labs.backtest) setTab("scan"); }, [tab, labs.backtest]);
   const [theme, setTheme] = useState(() => localStorage.getItem("sig.theme") || "dark");
   const [settings, setSettingsS] = useState<Settings>(DEFAULTS); const [prefill, setPrefill] = useState<Trade | null>(null);
@@ -65,7 +65,7 @@ export default function App() {
       <main>
         {!ready ? <p className="dim small center" role="status">Loading…</p> : <>
         <Suspense fallback={<p className="dim small center" role="status">Loading…</p>}>
-        {tab === "forward" && <ForwardView />}
+        {tab === "forward" && (labs.forward ? <ForwardView /> : <section className="card stack" data-labs-off><h2>Forward test</h2><p className="dim">This is a Labs feature. Turn on "Forward test" under Labs in Settings to see it.</p></section>)}
         {tab === "today" && <TodayView settings={settings} go={setTab} />}
         {tab === "scan" && <ScanView stratId={stratId} onPickStrategy={pickStrategy} settings={settings} theme={theme} onJournal={journal} />}
         {tab === "watch" && <Watchlist settings={settings} onOpen={(ex, sym, tf) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); setTab("scan"); }} />}

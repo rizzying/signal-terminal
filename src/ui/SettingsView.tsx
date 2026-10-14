@@ -15,6 +15,7 @@ export function SettingsView({ settings, setSettings, stratId, onPickStrategy }:
       <div className="card" data-labs>
         <div className="cardhead"><h2>Labs</h2><span className="lbl">experimental · saved on this device</span></div>
         <label className="param"><span>Backtest (experimental)<small className="dim"> · adds a Backtest tab under More. Past results, not a promise.</small></span><input type="checkbox" aria-label="Backtest (experimental)" checked={labs.backtest} onChange={(e) => setLabs({ ...labs, backtest: e.target.checked })} /></label>
+        <label className="param"><span>Forward test<small className="dim"> · adds a Forward test tab under More. Live paper results of past setups, still a small sample.</small></span><input type="checkbox" aria-label="Forward test" checked={labs.forward} onChange={(e) => setLabs({ ...labs, forward: e.target.checked })} /></label>
       </div>
       <StrategiesCard settings={settings} stratId={stratId} onPick={onPickStrategy} setSettings={setSettings} />
       {groups.map((g) => (
