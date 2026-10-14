@@ -36,20 +36,24 @@ export const tabOf = (t) => (t.status === "open" || t.status === "closed" ? "fil
 export const tstatus = (t) => (t.status === "closed" ? (t.exit_reason === "tp" ? "tp" : "sl") : t.status);
 export const TSTATUS = [["pending", "Pending order"], ["open", "Open"], ["tp", "TP"], ["sl", "SL"], ["cancelled", "Cancelled"], ["expired", "Expired"]];
 const list = (v) => (v == null || v === "" ? [] : String(v).split(",").map((x) => x.trim()).filter(Boolean));
-export function parseTradeFilters(q = {}) { return { tab: TABS.some((t) => t.key === q.tab) ? q.tab : "all", market: list(q.market), side: list(q.side), status: list(q.status) }; }
+/** Display ID for a trade row: fwd_trades.id as "F-12". */
+export const tradeId = (t) => (t?.id == null ? "" : `F-${t.id}`);
+/** Parse a search like "12", "F-12", "f12", "#12" into the numeric id string, or "" if not an id. */
+export const parseTradeId = (v) => { const m = /^\s*#?\s*(?:f\s*-?\s*)?(\d+)\s*$/i.exec(String(v ?? "")); return m ? String(Number(m[1])) : ""; };
+export function parseTradeFilters(q = {}) { return { tab: TABS.some((t) => t.key === q.tab) ? q.tab : "all", market: list(q.market), side: list(q.side), status: list(q.status), id: parseTradeId(q.id) }; }
 export function filterTrades(T, f, skip) {
   return T.filter((t) => (skip === "tab" || f.tab === "all" || tabOf(t) === f.tab) && (skip === "market" || !f.market.length || f.market.includes(t.market))
-    && (skip === "side" || !f.side.length || f.side.includes(t.side)) && (skip === "status" || !f.status.length || f.status.includes(tstatus(t))));
+    && (skip === "side" || !f.side.length || f.side.includes(t.side)) && (skip === "status" || !f.status.length || f.status.includes(tstatus(t))) && (!f.id || String(t.id) === f.id));
 }
 export function tradeCounts(T, f) {
   const cnt = (dim, val) => { const o = {}; for (const t of filterTrades(T, f, dim)) { const k = val(t); o[k] = (o[k] ?? 0) + 1; } return o; };
   return { tab: { ...cnt("tab", tabOf), all: filterTrades(T, f, "tab").length }, market: cnt("market", (t) => t.market), side: cnt("side", (t) => t.side), status: cnt("status", tstatus) };
 }
-const H = ["strategy", "rules_hash", "market", "side", "status", "placed_wib", "entry", "sl", "tp", "risk", "replaced", "fill_wib", "exit_wib", "exit_px", "exit_reason", "bars", "r_gross", "cost_r", "funding_r", "funding_src", "r_net"];
+const H = ["id", "strategy", "rules_hash", "market", "side", "status", "placed_wib", "entry", "sl", "tp", "risk", "replaced", "fill_wib", "exit_wib", "exit_px", "exit_reason", "bars", "r_gross", "cost_r", "funding_r", "funding_src", "r_net"];
 const wib = (t) => (t == null ? "" : new Date(Number(t) + 7 * 3.6e6).toISOString().slice(0, 16).replace("T", " "));
 const cell = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 export function tradesCsv(T) {
-  return [H.join(","), ...T.map((t) => [t.strategy, t.rules_hash, t.market, t.side, tstatus(t), wib(t.placed_t), t.entry, t.sl, t.tp, t.risk, t.replaced, wib(t.fill_t), wib(t.exit_t), t.exit_px, t.exit_reason,
+  return [H.join(","), ...T.map((t) => [tradeId(t), t.strategy, t.rules_hash, t.market, t.side, tstatus(t), wib(t.placed_t), t.entry, t.sl, t.tp, t.risk, t.replaced, wib(t.fill_t), wib(t.exit_t), t.exit_px, t.exit_reason,
     t.bars, ...["r_gross", "cost_r", "funding_r"].map((k) => (t[k] == null ? "" : Number(t[k]).toFixed(4))), t.funding_src, t.r_net == null ? "" : Number(t.r_net).toFixed(4)].map(cell).join(","))].join("\n") + "\n";
 }
 /** Mirrors STRATEGY / rulesHash() in trader.ts (a test keeps them in sync). */

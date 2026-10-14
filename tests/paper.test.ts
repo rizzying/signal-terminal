@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { step, settle, tradesThrough, buffer, rulesHash, SPEC, STRATEGY, type State, type Plan, type Trade } from "../src/forward/trader";
 import { paperJob } from "../src/forward/paperJob";
-import { meanCI, maxDdR, scorecard, verdict, tCrit, filterTrades, tradeCounts, parseTradeFilters, tradesCsv, today } from "../src/forward/paper.js";
+import { meanCI, maxDdR, scorecard, verdict, tCrit, filterTrades, tradeCounts, parseTradeFilters, tradesCsv, today, parseTradeId, tradeId } from "../src/forward/paper.js";
 import { wibDay } from "../src/forward/trader";
 import { wibRange, type Stmt } from "../src/forward/paperJob";
 const H = 3.6e6, M = "BTCUSDT";
@@ -127,4 +127,14 @@ it("job: a crash midway through a coin's run leaves no half-written candle, and 
   await paperJob(c.q, { now, klines: klAt(now), funding: fu0, log: quiet, tx: c.tx }); const got = await dump(c.q);
   expect(got.cur).toEqual(want.cur); expect(got.ev).toEqual(want.ev); expect(got.tr.map(({ r_net, ...x }: any) => x)).toEqual(want.tr.map(({ r_net, ...x }: any) => x));
   got.tr.forEach((t: any, i: number) => expect(t.r_net ?? 0).toBeCloseTo(want.tr[i].r_net ?? 0, 9));
+});
+
+test("trade IDs: F-12 display, search accepts 12 / F-12 / f12, CSV first column", () => {
+  for (const v of ["12", "F-12", "f12", " f-12 ", "#12"]) expect(parseTradeId(v)).toBe("12");
+  for (const v of ["", "abc", "F-", "1.5"]) expect(parseTradeId(v)).toBe("");
+  expect(tradeId({ id: 12 })).toBe("F-12");
+  const T: any[] = [{ id: 12, market: "BTCUSDT", side: "long", status: "pending" }, { id: 3, market: "ETHUSDT", side: "short", status: "pending" }];
+  expect(filterTrades(T, parseTradeFilters({ id: "f12" })).map((t) => t.id)).toEqual([12]);
+  expect(filterTrades(T, parseTradeFilters({})).length).toBe(2);
+  const csv = tradesCsv(T).split("\n"); expect(csv[0].startsWith("id,strategy")).toBe(true); expect(csv[1].startsWith("F-12,")).toBe(true);
 });
