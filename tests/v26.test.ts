@@ -9,14 +9,16 @@ describe("v2.6 liquidation clusters as entries", () => {
     const k = heavyClusters(a, "short", 100); expect(k).toHaveLength(1); expect(k[0].lo).toBe(104); expect(k[0].hi).toBe(104.25); expect(k[0].p).toBe(104);
     expect(heavyClusters(a, "long", 100)).toEqual([]); // the 97 bin is short liqs, wrong side for longs
   });
-  it("a lone cluster becomes a 'Liq zone' entry with the stop beyond it plus the buffer", () => {
-    const z = buildZones(flat(), an(bins([[104, 10]])), "short", DEFAULTS); const lz = z.find((x) => x.source.startsWith("Liq zone"))!;
+  it("a lone cluster far from any structure is NOT an entry (v2.7.5); next to a swing it becomes a 'Liq zone'", () => {
+    expect(buildZones(flat(), an(bins([[104, 10]]), { atr: 1.5 }), "short", DEFAULTS).some((x) => x.source.startsWith("Liq zone"))).toBe(false);
+    const sw = { i: 50, price: 105.2, kind: "high" } as any; // swing 1.1 above the cluster: too far to merge (0.3 ATR) but within 1 ATR
+    const z = buildZones(flat(), an(bins([[104, 10]]), { atr: 1.5, pivots: [sw] }), "short", DEFAULTS); const lz = z.find((x) => x.source.startsWith("Liq zone"))!;
     expect(lz).toBeTruthy(); expect(lz.bottom).toBeLessThanOrEqual(104); expect(lz.top).toBeGreaterThanOrEqual(104);
-    expect(lz.stop).toBeGreaterThan(104 + DEFAULTS.stopAtr * 1); // beyond cluster + stopAtr×ATR (+ costs)
+    expect(lz.stop).toBeGreaterThan(104 + DEFAULTS.stopAtr * 1.5);
   });
   it("a cluster next to an order block extends that zone and tags it", () => {
     const ob = { top: 103.8, bottom: 103.2, i: 100, kind: "OB" as const, dir: "bear" as const };
-    const z = buildZones(flat(), an(bins([[104, 10]]), { obs: [ob] }), "short", DEFAULTS)[0];
+    const z = buildZones(flat(), an(bins([[104, 10]]), { obs: [ob], atr: 2 }), "short", DEFAULTS)[0];
     expect(z.source).toBe("Bearish OB + Liq zone"); expect(z.top).toBeGreaterThanOrEqual(104); expect(z.bottom).toBeCloseTo(103.2);
   });
   it("Liq magnet passes when a heavy cluster is in/near a zone; off and no-heatmap skip it", () => {
@@ -37,7 +39,7 @@ describe("Liq magnet needs structure (rizzy's rule)", () => {
   });
   it("passes when the cluster merges into an OB, naming it and the zone", () => {
     const ob = { top: 103.8, bottom: 103.2, i: 100, kind: "OB" as const, dir: "bear" as const };
-    const m = liqMagnetSignal(flat(), an(bins([[104, 10]]), { obs: [ob] }), "short", DEFAULTS); expect(m.pass).toBe(true); expect(m.detail).toBe("Liq cluster ~104 lines up with Bearish OB (Zone 1)");
+    const m = liqMagnetSignal(flat(), an(bins([[104, 10]]), { obs: [ob], atr: 2 }), "short", DEFAULTS); expect(m.pass).toBe(true); expect(m.detail).toBe("Liq cluster ~104 lines up with Bearish OB (Zone 1)");
   });
   it("passes within 0.5 ATR of a structure zone, fails beyond", () => {
     const fvg = (top: number) => ({ top, bottom: top - 0.3, i: 100, kind: "FVG" as const, dir: "bear" as const });

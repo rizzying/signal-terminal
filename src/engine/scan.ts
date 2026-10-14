@@ -176,10 +176,14 @@ export function costsAt(entry: number, ci: CostInput | undefined, s: Settings): 
   const spread = ci && s.useSpread ? Math.max(0, ci.spread) : 0; const fees = entry * 2 * ((ci?.feePct ?? 0) / 100); const slip = entry * 2 * (s.slippagePct / 100);
   return { spread, fees, slip, total: spread + fees + slip };
 }
+/** Zones farther than this many ATRs from price are dropped. */
+export const MAX_ZONE_ATR = 3.5;
+/** A stand-alone liq-cluster zone must be within this many ATRs of a swing/OB/FVG/breaker. */
+export const LIQ_NEAR_ATR = 1;
 export function buildZones(c: Candle[], an: Analysis, dir: Dir, s: Settings, ci?: CostInput): Zone[] {
   const px = c.at(-1)!.c; const bull = dir === "long"; const d = bull ? "bull" : "bear"; const A = an.atr;
   let cands: Box[] = [...an.obs, ...an.fvgs, ...an.breakers].filter((z) => z.dir === d && (bull ? z.bottom < px : z.top > px));
-  const swings = an.pivots.filter((p) => p.kind === (bull ? "low" : "high") && (bull ? p.price < px : p.price > px))
+  let swings = an.pivots.filter((p) => p.kind === (bull ? "low" : "high") && (bull ? p.price < px : p.price > px))
     .map<Box>((p) => ({ top: bull ? p.price + 0.15 * A : p.price, bottom: bull ? p.price : p.price - 0.15 * A, i: p.i, kind: "Swing", dir: d }));
   const dist = (z: Box) => (bull ? px - z.top : z.bottom - px);
   cands = cands.map((z) => (bull ? { ...z, top: Math.min(z.top, px) } : { ...z, bottom: Math.max(z.bottom, px) }));
@@ -188,8 +192,12 @@ export function buildZones(c: Candle[], an: Analysis, dir: Dir, s: Settings, ci?
     const box = { lo: k.lo - 0.1 * A, hi: k.hi + 0.1 * A }; const near = (z: Box) => box.lo <= z.top + 0.3 * A && z.bottom <= box.hi + 0.3 * A;
     const all = [...cands, ...swings]; const j = all.findIndex(near);
     if (j >= 0) { const z = all[j]; z.top = Math.max(z.top, bull ? Math.min(box.hi, px) : box.hi); z.bottom = Math.min(z.bottom, bull ? box.lo : Math.max(box.lo, px)); z.liq = k.p; }
-    else cands.push({ top: bull ? Math.min(box.hi, px) : box.hi, bottom: bull ? box.lo : Math.max(box.lo, px), i: c.length - 1, kind: "Liq zone", dir: d, liq: k.p });
+    else if (all.some((z) => box.lo <= z.top + LIQ_NEAR_ATR * A && z.bottom <= box.hi + LIQ_NEAR_ATR * A)) // a stand-alone liq zone must sit next to real structure
+      cands.push({ top: bull ? Math.min(box.hi, px) : box.hi, bottom: bull ? box.lo : Math.max(box.lo, px), i: c.length - 1, kind: "Liq zone", dir: d, liq: k.p });
   }
+  // distance cap: zones whose middle is more than MAX_ZONE_ATR × ATR from price are dropped (old, far-away structure or clusters)
+  const inReach = (z: Box) => Math.abs((z.top + z.bottom) / 2 - px) <= MAX_ZONE_ATR * A;
+  cands = cands.filter(inReach); swings = swings.filter(inReach);
   const pick: Box[] = [];
   const overlaps = (a: Box, b: Box) => a.bottom <= b.top + 0.1 * A && b.bottom <= a.top + 0.1 * A;
   for (const z of [...cands].sort((a, b) => dist(a) - dist(b))) if (!pick.some((p) => overlaps(p, z))) pick.push(z);
@@ -198,11 +206,12 @@ export function buildZones(c: Candle[], an: Analysis, dir: Dir, s: Settings, ci?
   let chosen: Box[];
   if (pick.length <= 3) chosen = pick;
   else chosen = [pick[0], pick[Math.floor((pick.length - 1) / 2)], pick[pick.length - 1]].filter((z, i, arr) => arr.indexOf(z) === i);
-  while (chosen.length < 3) { // fallback: ATR-stepped levels from the deepest so far
-    const base = chosen.at(-1) ?? { top: px, bottom: px } as Box; const step = A * (chosen.length + 1);
-    const lvl = bull ? Math.min(base.bottom, px) - step : Math.max(base.top, px) + step;
-    chosen.push({ top: bull ? lvl + 0.2 * A : lvl, bottom: bull ? lvl : lvl - 0.2 * A, i: c.length - 1, kind: "Swing", dir: d, retests: -1 });
-  }
+  // fallback: ATR-stepped levels inside the cap, beyond the deepest real zone first (real structure keeps the nearer ranks), skipping overlaps
+  const deep = chosen.length ? Math.max(...chosen.map(dist)) : -Infinity; const steps = [1, 1.5, 2, 2.5, 3, MAX_ZONE_ATR].map((m) => m * A);
+  for (const off of [...steps.filter((o) => o > deep), ...steps.filter((o) => o <= deep).reverse()]) { if (chosen.length >= 3) break; const lvl = bull ? px - off : px + off;
+    const b: Box = { top: bull ? lvl + 0.2 * A : lvl, bottom: bull ? lvl : lvl - 0.2 * A, i: c.length - 1, kind: "Swing", dir: d, retests: -1 };
+    if (!chosen.some((p) => overlaps(p, b))) chosen.push(b); }
+  chosen.sort((a, b) => dist(a) - dist(b));
   const opp = an.pivots.filter((p) => p.kind === (bull ? "high" : "low")).map((p) => p.price);
   const names = ["Aggressive", "Balanced", "Deep"] as const;
   return chosen.slice(0, 3).map((z, k) => {
@@ -216,7 +225,8 @@ export function buildZones(c: Candle[], an: Analysis, dir: Dir, s: Settings, ci?
     const need = s.minRR * R + costs.total;
     // TP1 is a fixed R multiple (what the backtest study tested); TP2 = next structure beyond it
     const t1 = bull ? entry + need : entry - need;
-    const t2 = opp.filter((p) => (bull ? p > t1 : p < t1)).sort((a, b) => (bull ? a - b : b - a)).find((t) => Math.abs(t - entry) > Math.abs(t1 - entry) * 1.3) ?? (bull ? entry + Math.abs(t1 - entry) * 1.6 : entry - Math.abs(t1 - entry) * 1.6);
+    let t2 = opp.filter((p) => (bull ? p > t1 : p < t1)).sort((a, b) => (bull ? a - b : b - a)).find((t) => Math.abs(t - entry) > Math.abs(t1 - entry) * 1.3) ?? (bull ? entry + Math.abs(t1 - entry) * 1.6 : entry - Math.abs(t1 - entry) * 1.6);
+    if (!((t2 - t1) * (bull ? 1 : -1) > 0)) t2 = bull ? t1 + 0.6 * Math.abs(t1 - entry) : t1 - 0.6 * Math.abs(t1 - entry); // TP2 always beyond TP1
     const src0 = z.retests === -1 ? "ATR step (no structure)" : z.kind === "Liq zone" ? `Liq zone (est. ${bull ? "long" : "short"} liquidations ~${fmt(z.liq!)})` : z.kind === "Swing" ? `Swing ${bull ? "low" : "high"}` : `${d === "bull" ? "Bullish" : "Bearish"} ${z.kind}`;
     const src = z.liq != null && z.kind !== "Liq zone" ? `${src0} + Liq zone` : src0;
     return { pastTp1: bull ? px >= t1 : px <= t1, pastStop: bull ? px <= stop : px >= stop, costs, rawStop, rank: (k + 1) as 1 | 2 | 3, name: names[k], top: z.top, bottom: z.bottom, entry, stop, t1, t2, rr1: (Math.abs(t1 - entry) - costs.total) / R, rr2: (Math.abs(t2 - entry) - costs.total) / R, source: src, ready: px <= z.top + 1e-9 && px >= z.bottom - 1e-9, note: nudge.note };
