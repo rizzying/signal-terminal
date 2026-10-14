@@ -28,14 +28,26 @@ export function hideRepeats(rows) {
 }
 const dayWib = (t) => new Date(num(t) + 7 * 3600e3).toISOString().slice(0, 10);
 /** Filters from a query object: venue, symbol (base), tf, side, zone, status (waiting|running|win|loss|expired), from/to (YYYY-MM-DD, WIB). */
+/** Detailed status for the table filter: waiting, running, tp1 (TP1 reached, incl. still open), tp2, sl, expired. */
+export const STATUS5 = { waiting: "Waiting", running: "Running", tp1: "TP1", tp2: "TP2", sl: "SL", expired: "Expired" };
+export const status5 = (st) => (st === "tp1" || st === "tp1_open" ? "tp1" : st === "tp2" ? "tp2" : st === "sl" ? "sl" : st === "expired" ? "expired" : st === "open" ? "running" : "waiting");
+const OLD_STATUS = { win: ["tp1", "tp2"], loss: ["sl"] };
+/** Filters from a query object. venue, symbol (base), tf, side, zone and status accept comma-separated multi-selects; from/to are YYYY-MM-DD (WIB).
+ *  Values are validated and returned as sorted comma strings (or undefined). */
 export function parseFilters(q = {}) {
-  const pick = (k, ok) => (q[k] && ok(String(q[k])) ? String(q[k]) : undefined); const d = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s);
-  return { venue: pick("venue", (s) => s in FEE_PCT), symbol: pick("symbol", (s) => /^[A-Z0-9]{1,15}$/.test(s)), tf: pick("tf", (s) => s in TF_MS), side: pick("side", (s) => s === "long" || s === "short"),
-    zone: pick("zone", (s) => /^[123]$/.test(s)), fill: pick("fill", (s) => s in FILL_TABS), status: pick("status", (s) => ["waiting", "running", "win", "loss", "expired"].includes(s)), from: pick("from", d), to: pick("to", d) };
+  const multi = (k, ok, map = (x) => [x]) => { if (!q[k]) return undefined; const v = [...new Set(String(q[k]).split(",").flatMap((x) => (ok(x) ? map(x) : [])))].sort(); return v.length ? v.join(",") : undefined; };
+  const one = (k, ok) => (q[k] && ok(String(q[k])) ? String(q[k]) : undefined); const d = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+  return { venue: multi("venue", (s) => s in FEE_PCT), symbol: multi("symbol", (s) => /^[A-Z0-9]{1,15}$/.test(s)), tf: multi("tf", (s) => s in TF_MS), side: multi("side", (s) => s === "long" || s === "short"),
+    zone: multi("zone", (s) => /^[123]$/.test(s)), fill: one("fill", (s) => s in FILL_TABS), status: multi("status", (s) => s in STATUS5 || s in OLD_STATUS, (s) => OLD_STATUS[s] ?? [s]), from: one("from", d), to: one("to", d) };
 }
+const has = (list, v) => !list || list.split(",").includes(String(v));
+export const FDIMS = { venue: (r) => r.venue, symbol: (r) => base(r.symbol), tf: (r) => r.tf, side: (r) => r.side, zone: (r) => String(r.zone), status: (r) => status5(r.status) };
 export function filterRows(rows, f) {
-  return rows.filter((r) => (!f.venue || r.venue === f.venue) && (!f.symbol || base(r.symbol) === f.symbol) && (!f.tf || r.tf === f.tf) && (!f.side || r.side === f.side) && (!f.zone || String(r.zone) === f.zone)
-    && (!f.status || outcome(r.status) === f.status) && (!f.fill || fillTab(r.status) === f.fill) && (!f.from || dayWib(r.close_t) >= f.from) && (!f.to || dayWib(r.close_t) <= f.to));
+  return rows.filter((r) => Object.entries(FDIMS).every(([k, g]) => has(f[k], g(r))) && (!f.fill || fillTab(r.status) === f.fill) && (!f.from || dayWib(r.close_t) >= f.from) && (!f.to || dayWib(r.close_t) <= f.to));
+}
+/** Counts per value for each multi-select dimension, using every other active filter (spreadsheet-style). */
+export function filterCounts(rows, f) {
+  return Object.fromEntries(Object.entries(FDIMS).map(([k, g]) => { const c = {}; for (const r of filterRows(rows, { ...f, [k]: undefined })) { const v = g(r); c[v] = (c[v] ?? 0) + 1; } return [k, c]; }));
 }
 export function score(rows) {
   const c = { n: rows.length, waiting: 0, running: 0, win: 0, loss: 0, expired: 0 }; let sumR = 0, nR = 0;

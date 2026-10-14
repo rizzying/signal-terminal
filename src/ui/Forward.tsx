@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LATEST, VERSIONS, VERSION_LABEL } from "../forward/version.js";
-import { nextRunLabel, progress, SMALL_N, FILL_TABS } from "../forward/view.js";
+import { nextRunLabel, progress, SMALL_N, FILL_TABS, STATUS5 } from "../forward/view.js";
 import { topOfBook } from "../api/markets";
 import { fmt } from "../engine/scan";
 import { useVisibleInterval } from "./useVisibleInterval";
@@ -9,7 +9,7 @@ type Score = { n: number; waiting: number; running: number; win: number; loss: n
 type Z = { zone: number; entry_bottom: number; entry_top: number; sl: number; tp1: number; tp2: number; rr: number; status: string; outcome: string; rNet: number | null; bars: number | null };
 type SetupCard = { venue: string; symbol: string; tf: string; side: "long" | "short"; candle_t: number; close_t: number; version: string; conf_band: string; conf_pct: number; px: number | null; atr: number | null; zones: Z[] };
 type ZRow = { close_t: number; venue: string; symbol: string; tf: string; side: string; zone: number; entry_bottom: number; entry_top: number; sl: number; tp1: number; fill_t: number | null; fill_px: number | null; status: string; outcome: string; rNet: number | null };
-type Data = { configured: boolean; error?: string; lastRun?: { at: string } | null; versions?: { version: string; n: number }[]; hidden?: number; total?: number; score?: Score; by?: Record<string, ({ key: string } & Score)[]>; setups?: SetupCard[]; tabs?: Record<string, number>; zones?: ZRow[]; facets?: { venue: string[]; symbol: string[]; tf: string[] } };
+type Data = { configured: boolean; error?: string; lastRun?: { at: string } | null; versions?: { version: string; n: number }[]; hidden?: number; total?: number; score?: Score; by?: Record<string, ({ key: string } & Score)[]>; setups?: SetupCard[]; tabs?: Record<string, number>; zones?: ZRow[]; counts?: Record<string, Record<string, number>>; facets?: { venue: string[]; symbol: string[]; tf: string[] } };
 const VN: Record<string, string> = { hyperliquid: "Hyperliquid", bulk: "Bulk" };
 const OUT: Record<string, string> = { waiting: "waiting to fill", running: "filled, running", win: "TP1 hit", loss: "stopped", expired: "not filled (expired)" };
 const wib = (t: number | string) => new Date(t).toLocaleString("en-GB", { timeZone: "Asia/Jakarta", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }) + " WIB";
@@ -32,16 +32,37 @@ function Breakdown({ name, rows }: { name: string; rows: ({ key: string } & Scor
       <td data-label="Setups" className="num">{r.n}</td><td data-label="Resolved" className="num">{r.resolved}</td><td data-label="Win rate" className="num">{rateText(r.win, r.resolved)}</td>
       <td data-label="Avg R" className="num">{r.avgR == null ? "–" : r.avgR.toFixed(2)}</td><td data-label="Expired" className="num">{rateText(r.expired, r.filled + r.expired)}</td></tr>)}</tbody></table></div>;
 }
-function ZoneTable({ rows, order, onSort }: { rows: ZRow[]; order: string; onSort: () => void }) {
-  if (!rows.length) return <p className="note">No zones in this view.</p>;
-  return <div className="card"><table className="rt ztable"><thead><tr><th><button className="btn ghost sm" onClick={onSort} aria-label="Sort by time">Logged {order === "asc" ? "↑" : "↓"}</button></th><th>Setup</th><th>Zone</th><th>Entry</th><th>Stop</th><th>TP1</th><th>Fill (WIB) @ price</th><th>Status</th><th>Result</th></tr></thead>
+type Group = { key: "venue" | "symbol" | "tf" | "side" | "zone" | "status"; title: string; opts: [string, string][] };
+/** Spreadsheet-style header filter: multi-select checkboxes with counts, synced with the filter bar (same state). */
+export function HeaderFilter({ label, groups, f, counts, set }: { label: string; groups: Group[]; f: Filters; counts?: Record<string, Record<string, number>>; set: (k: Group["key"], v: string) => void }) {
+  const [open, setOpen] = useState(false); const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (!open) return; const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); }; addEventListener("mousedown", h); return () => removeEventListener("mousedown", h); }, [open]);
+  const active = groups.reduce((n, g) => n + (f[g.key] ? f[g.key]!.split(",").length : 0), 0);
+  const toggle = (g: Group, v: string) => { const cur = new Set(f[g.key]?.split(",") ?? []); cur.has(v) ? cur.delete(v) : cur.add(v); set(g.key, [...cur].sort().join(",")); };
+  return <div className="hfilter" ref={ref}>
+    <button className={`btn ghost sm ${active ? "on" : ""}`} aria-haspopup="true" aria-expanded={open} onClick={() => setOpen(!open)}>{label} ▾{active > 0 && <span className="badge new">{active}</span>}</button>
+    {open && <div className="hpop card" role="dialog" aria-label={`Filter ${label}`}>
+      {groups.map((g) => <fieldset key={g.key}><legend className="lbl">{g.title}</legend>{g.opts.map(([v, t]) => { const n = counts?.[g.key]?.[v] ?? 0; const on = !!f[g.key]?.split(",").includes(v);
+        return <label key={v} className={`hopt ${!n && !on ? "dim" : ""}`}><input type="checkbox" checked={on} onChange={() => toggle(g, v)} /> {t} <span className="mono dim">{n}</span></label>; })}</fieldset>)}
+      <div className="row between"><button className="btn ghost sm" disabled={!active} onClick={() => groups.forEach((g) => set(g.key, ""))}>Clear</button><button className="btn sm" onClick={() => setOpen(false)}>Done</button></div>
+    </div>}
+  </div>;
+}
+function ZoneTable({ rows, order, onSort, hf }: { rows: ZRow[]; order: string; onSort: () => void; hf: (label: string, groups: Group[]) => React.ReactNode }) {
+  const setupG = useSetupGroups(); const zoneG: Group[] = [{ key: "zone", title: "Zone", opts: [["1", "Z1"], ["2", "Z2"], ["3", "Z3"]] }]; const statusG: Group[] = [{ key: "status", title: "Status", opts: Object.entries(STATUS5) as [string, string][] }];
+  return <div className="card">
+    <div className="zfilters-m row gap wrap"><span className="lbl">Filter</span>{hf("Setup", setupG)}{hf("Zone", zoneG)}{hf("Status", statusG)}</div>
+    {!rows.length ? <p className="note">No zones in this view.</p> : <>
+    <table className="rt ztable"><thead><tr><th><button className="btn ghost sm" onClick={onSort} aria-label="Sort by time">Logged {order === "asc" ? "↑" : "↓"}</button></th><th>{hf("Setup", setupG)}</th><th>{hf("Zone", zoneG)}</th><th>Entry</th><th>Stop</th><th>TP1</th><th>Fill (WIB) @ price</th><th>{hf("Status", statusG)}</th><th>Result</th></tr></thead>
     <tbody>{rows.map((r, i) => <tr key={i}><td data-label="Logged">{wib(r.close_t)}</td><td data-label="Setup">{VN[r.venue]} <b>{r.symbol}</b> {r.tf.toUpperCase()} <span className={`badge ${r.side}`}>{r.side}</span></td><td data-label="Zone">Z{r.zone}</td>
       <td data-label="Entry" className="num">{fmt(r.entry_bottom)}–{fmt(r.entry_top)}</td><td data-label="Stop" className="num neg">{fmt(r.sl)}</td><td data-label="TP1" className="num pos">{fmt(r.tp1)}</td>
       <td data-label="Fill" className="num">{r.fill_t ? <>{wib(r.fill_t)} @ ≈{fmt(r.fill_px!)}</> : "–"}</td><td data-label="Status">{OUT[r.outcome]}</td>
       <td data-label="Result" className={`num ${r.rNet == null ? "" : r.rNet >= 0 ? "pos" : "neg"}`}>{r.rNet == null ? "–" : `${r.rNet >= 0 ? "+" : ""}${r.rNet.toFixed(2)}R`}</td></tr>)}</tbody></table>
     {rows.length >= 300 && <p className="dim small">Showing the 300 {order === "asc" ? "oldest" : "newest"}; narrow the filters or export the CSV for all.</p>}
-    <p className="dim small">Fill time is the open of the first closed candle that reached the zone; fill price is estimated as the zone edge it touched.</p></div>;
+    <p className="dim small">Fill time is the open of the first closed candle that reached the zone; fill price is estimated as the zone edge it touched.</p></>}</div>;
 }
+const SetupCtx = { groups: [] as Group[] };
+const useSetupGroups = () => SetupCtx.groups;
 function Card({ s, px, prevPx, now }: { s: SetupCard; px?: number; prevPx?: number; now: number }) {
   return <article className="card fsetup">
     <div className="cardhead"><h3>{VN[s.venue]} {s.symbol} · {s.tf.toUpperCase()} <span className={`badge ${s.side}`}>{s.side}</span></h3><span className="lbl">{wib(s.close_t)} · {s.conf_band} {s.conf_pct}% · {s.version}</span></div>
@@ -70,8 +91,10 @@ export function ForwardView() {
   if (!d) return <section className="card"><p className="dim" role="status">Loading…</p></section>;
   if (!d.configured || d.error) return <section className="card stack"><h2>Forward test</h2><p className="dim">{d.error ?? "The forward test is being set up. Results will appear here after the first hourly run."}</p></section>;
   const s = d.score!; const set = (k: keyof Filters, v: string) => setF((x) => ({ ...x, [k]: v || undefined }));
-  const sel = (k: keyof Filters, label: string, opts: [string, string][]) => <label className="fsel"><span className="lbl">{label}</span><select className="input" value={f[k] ?? ""} onChange={(e) => set(k, e.target.value)}><option value="">All</option>{opts.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label>;
+  const sel = (k: keyof Filters, label: string, opts: [string, string][]) => { const multi = f[k]?.includes(",");
+    return <label className="fsel"><span className="lbl">{label}</span><select className="input" value={f[k] ?? ""} onChange={(e) => set(k, e.target.value)}><option value="">All</option>{multi && <option value={f[k]} disabled>{f[k]!.split(",").length} selected</option>}{opts.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label>; };
   const fc = d.facets ?? { venue: [], symbol: [], tf: [] };
+  SetupCtx.groups = [{ key: "venue", title: "Venue", opts: fc.venue.map((v) => [v, VN[v] ?? v]) }, { key: "symbol", title: "Coin", opts: fc.symbol.map((v) => [v, v]) }, { key: "tf", title: "Timeframe", opts: fc.tf.map((v) => [v, v.toUpperCase()]) }, { key: "side", title: "Side", opts: [["long", "Long"], ["short", "Short"]] }];
   return (
     <section className="stack rise forward">
       <div className="card stack">
@@ -83,7 +106,7 @@ export function ForwardView() {
           {d.lastRun && <span className="dim small">Last update {wib(d.lastRun.at)}.</span>}</div>
         <div className="ffilters">
           {sel("venue", "Venue", fc.venue.map((v) => [v, VN[v] ?? v]))}{sel("symbol", "Coin", fc.symbol.map((v) => [v, v]))}{sel("tf", "Timeframe", fc.tf.map((v) => [v, v.toUpperCase()]))}
-          {sel("side", "Side", [["long", "Long"], ["short", "Short"]])}{sel("zone", "Zone", [["1", "Z1"], ["2", "Z2"], ["3", "Z3"]])}{sel("status", "Status", Object.entries(OUT))}
+          {sel("side", "Side", [["long", "Long"], ["short", "Short"]])}{sel("zone", "Zone", [["1", "Z1"], ["2", "Z2"], ["3", "Z3"]])}{sel("status", "Status", Object.entries(STATUS5) as [string, string][])}
           <label className="fsel"><span className="lbl">From</span><input className="input" type="date" value={f.from ?? ""} onChange={(e) => set("from", e.target.value)} /></label>
           <label className="fsel"><span className="lbl">To</span><input className="input" type="date" value={f.to ?? ""} onChange={(e) => set("to", e.target.value)} /></label>
           {Object.values(f).some(Boolean) && <button className="btn ghost sm" onClick={() => setF({})}>Clear filters</button>}
@@ -95,7 +118,7 @@ export function ForwardView() {
         <Board s={s} />
         <div className="fbreak">{([["zone", "zone"], ["tf", "timeframe"], ["venue", "venue"], ["side", "side"], ["symbol", "coin"]] as const).map(([k, n]) => <Breakdown key={k} name={n} rows={d.by?.[k] ?? []} />)}</div>
         <h3>Zones <span className="dim small">({d.total} · one row per zone)</span></h3>
-        <ZoneTable rows={d.zones ?? []} order={f.order ?? "desc"} onSort={() => set("order", (f.order ?? "desc") === "desc" ? "asc" : "")} />
+        <ZoneTable rows={d.zones ?? []} order={f.order ?? "desc"} onSort={() => set("order", (f.order ?? "desc") === "desc" ? "asc" : "")} hf={(label, groups) => <HeaderFilter label={label} groups={groups} f={f} counts={d.counts} set={set} />} />
         <h3>Latest setups <span className="dim small">({Math.min(40, d.setups?.length ?? 0)} newest)</span></h3>
         <div className="fcards">{d.setups!.map((x) => <Card key={`${x.venue}|${x.symbol}|${x.tf}|${x.side}|${x.candle_t}`} s={x} px={px[`${x.venue}|${x.symbol}`]} prevPx={prev.current[`${x.venue}|${x.symbol}`]} now={now} />)}</div>
       </>}

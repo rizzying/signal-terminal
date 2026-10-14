@@ -2,7 +2,7 @@
 import { neon } from "@neondatabase/serverless";
 import { toCsv, csvFilename, CSV_CAP } from "../src/forward/csv.js";
 import { VERSION_SQL, parseVersion } from "../src/forward/version.js";
-import { hideRepeats, parseFilters, filterRows, score, breakdown, setups, facets, DIMS, fillCounts, zoneRows } from "../src/forward/view.js";
+import { hideRepeats, parseFilters, filterRows, score, breakdown, setups, facets, DIMS, fillCounts, zoneRows, filterCounts } from "../src/forward/view.js";
 export const config = { maxDuration: 20 };
 export default async function handler(req, res) {
   const url = process.env.DATABASE_URL;
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     }
     res.setHeader("Cache-Control", "public, s-maxage=120, stale-while-revalidate=600");
     return res.status(200).json({ configured: true, lastRun: runs[0] ?? null, version: ver, versions, filters: f, hidden, total: rows.length,
-      score: score(rows), by: Object.fromEntries(Object.keys(DIMS).map((d) => [d, breakdown(rows, d)])), setups: setups(rows, 40), facets: facets(shown), tabs: tabCounts, zones: zoneRows(rows, q.order === "asc" ? "asc" : "desc", 300), at: Date.now() });
+      score: score(rows), by: Object.fromEntries(Object.keys(DIMS).map((d) => [d, breakdown(rows, d)])), setups: setups(rows, 40), facets: facets(shown), tabs: tabCounts, counts: filterCounts(shown, f), zones: zoneRows(rows, q.order === "asc" ? "asc" : "desc", 300), at: Date.now() });
   } catch (e) {
     res.setHeader("Cache-Control", "s-maxage=30");
     const msg = String(e?.message ?? e).replace(/postgres(ql)?:\/\/[^\s]+/g, "postgres://***");

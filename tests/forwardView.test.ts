@@ -54,3 +54,11 @@ it("fill tabs: filled = running/TP1/TP2/SL, waiting, expired; zone rows sortable
   const z = zoneRows(rs); expect(z[0].close_t).toBe(3 * H); expect(zoneRows(rs, "asc")[0].close_t).toBe(H);
   expect(z.find((x) => x.side === "short")!.fill_px).toBe(2463.565); expect(z.find((x) => x.outcome === "running")!.fill_px).toBe(2483.83); expect(z.find((x) => x.outcome === "waiting")!.fill_px).toBeNull();
 });
+
+import { filterCounts, status5 } from "../src/forward/view.js";
+it("multi-select header filters: comma lists, validated, counts per value exclude their own dimension", () => {
+  const rs = [row({ zone: 1, status: "tp1_open" }), row({ zone: 2, status: "sl" }), row({ zone: 3, venue: "hyperliquid", symbol: "ETH" }), row({ zone: 1, status: "tp2", tf: "15m" })];
+  const f = parseFilters({ zone: "1,2,9", status: "tp1,sl,bogus", venue: "bulk,hyperliquid" }); expect(f).toMatchObject({ zone: "1,2", status: "sl,tp1", venue: "bulk,hyperliquid" });
+  expect(filterRows(rs, f)).toHaveLength(2); expect(parseFilters({ status: "win" }).status).toBe("tp1,tp2"); expect(status5("tp1_open")).toBe("tp1"); expect(status5("open")).toBe("running");
+  const c = filterCounts(rs, parseFilters({ zone: "1" })); expect(c.zone).toEqual({ "1": 2, "2": 1, "3": 1 }); expect(c.status).toEqual({ tp1: 1, tp2: 1 }); expect(c.symbol).toEqual({ ETH: 2 });
+});
