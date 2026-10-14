@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { LATEST, VERSIONS, VERSION_LABEL } from "../forward/version.js";
 import { by, DIM_LABEL, rates, SMALL, type Dim, type Rates, type Row } from "../forward/stats";
-type Data = { configured: boolean; error?: string; lastRun?: { at: string; inserted: number; resolved: number } | null; groups?: Row[]; recent?: any[]; span?: { venue: string; first: number; candles: number }[] };
+type Data = { configured: boolean; error?: string; lastRun?: { at: string; inserted: number; resolved: number } | null; groups?: Row[]; recent?: any[]; span?: { venue: string; first: number; candles: number }[]; versions?: { version: string; n: number }[] };
 type View = "all" | "hyperliquid" | "bulk" | "compare";
 const VN: Record<string, string> = { hyperliquid: "Hyperliquid", bulk: "Bulk" };
 const p = (x: number | null) => (x == null ? "–" : `${Math.round(x)}%`);
@@ -27,8 +28,8 @@ function Compare({ rows, dim }: { rows: Row[]; dim: Dim }) {
       <td data-label="Bulk" className="num">{cell(b)}<small className="dim"> · fill {p(b?.fillRate ?? null)} · n={b?.withResult ?? 0}</small></td></tr>; })}</tbody></table></div>;
 }
 export function ForwardView() {
-  const [d, setD] = useState<Data | null>(null); const [err, setErr] = useState(""); const [view, setView] = useState<View>("all");
-  useEffect(() => { fetch("/api/forward").then((r) => r.json()).then(setD).catch(() => setErr("Couldn't load the forward test right now.")); }, []);
+  const [d, setD] = useState<Data | null>(null); const [err, setErr] = useState(""); const [view, setView] = useState<View>("all"); const [ver, setVer] = useState<string>(LATEST);
+  useEffect(() => { setD(null); fetch(`/api/forward?v=${ver}`).then((r) => r.json()).then(setD).catch(() => setErr("Couldn't load the forward test right now.")); }, [ver]);
   if (err) return <section className="card"><p className="alert">{err}</p></section>;
   if (!d) return <section className="card"><p className="dim" role="status">Loading…</p></section>;
   if (!d.configured || d.error) return <section className="card stack"><h2>Forward test</h2><p className="dim">{d.error ?? "The forward test is being set up. Results will appear here after the first hourly run."}</p></section>;
@@ -38,10 +39,14 @@ export function ForwardView() {
   return (
     <section className="stack rise forward">
       <div className="card stack">
-        <div className="cardhead"><h2>Forward test</h2><span className="row gap"><span className="badge">live · still growing</span><a className="btn sm" href="/api/forward?format=csv" download>Export CSV</a></span></div>
+        <div className="cardhead"><h2>Forward test</h2><span className="row gap"><span className="badge">live · still growing</span><a className="btn sm" href={`/api/forward?format=csv&v=${ver}`} download>Export CSV</a></span></div>
         <p className="small">Every hour, Signal checks BTC, ETH and SOL on 1H and 4H, on Hyperliquid and on Bulk. When the default strategy finds a setup, it saves all 3 zones and never changes them. Then it watches what price does next.</p>
         <p className="dim small"><b>Filled</b> = price reached the entry zone within 24 candles. <b>TP1 / TP2 / Stop</b> = what was hit first after filling (if a stop and a target fall in the same candle, it counts as a stop). Only finished candles are used. This is real, unseen data, but it's still young: small numbers can change a lot. Not financial advice.</p>
         {d.lastRun && <p className="dim small">Last update {wib(d.lastRun.at)}.{bulkSpan ? ` Bulk feed since ${wib(Number(bulkSpan.first))}.` : ""}</p>}
+        <div className="row gap wrap"><label className="lbl" htmlFor="fwd-ver">Rules version</label>
+          <select id="fwd-ver" className="input" value={ver} onChange={(e) => setVer(e.target.value)}>{[...VERSIONS, "all"].map((v) => { const n = v === "all" ? d.versions?.reduce((a, x) => a + x.n, 0) : d.versions?.find((x) => x.version === v)?.n; return <option key={v} value={v}>{(VERSION_LABEL as Record<string, string>)[v]}{n != null ? ` (${n})` : " (0)"}</option>; })}</select>
+          <span className="dim small">v1 = original zones · v2 = zones capped at 3.5 ATR (from 14 Oct 09:02 WIB) · v3 = same as v2, each setup logged once until it changes or ends.</span></div>
+        {!all.length && <p className="note small">No setups recorded under {(VERSION_LABEL as Record<string, string>)[ver]} yet. They appear after the next hourly run.</p>}
         <div className="seg" role="tablist" aria-label="Venue">{(["all", "hyperliquid", "bulk", "compare"] as View[]).map((v) => <button key={v} role="tab" aria-selected={view === v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{v === "all" ? "All" : v === "compare" ? "Side by side" : VN[v]}</button>)}</div>
         {view === "bulk" && <p className="note small">Bulk's history is short, so its sample is small. Give it a few weeks before reading much into it.</p>}
       </div>

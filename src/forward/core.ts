@@ -1,7 +1,7 @@
 // Forward test core: pure functions shared by the scheduled job (scripts/forward.ts) and tests.
 // Uses the exact same scan engine as the app (src/engine/scan.ts).
 import type { Candle } from "../engine/indicators";
-import { scan, roundSetup, MIN_CANDLES, type Setup } from "../engine/scan";
+import { scan, roundSetup, analyze, MIN_CANDLES, type Setup } from "../engine/scan";
 import { DEFAULTS, sanitize, type Settings } from "../engine/settings";
 import { mmrFor } from "../engine/liq";
 import { feeFor, roundTick, TF_MS, type TF } from "../api/markets";
@@ -22,21 +22,31 @@ export function settingsHash(s: Settings): string {
   let h = 0x811c9dc5; for (const ch of JSON.stringify(norm(s))) { h ^= ch.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return "v1-" + h.toString(16).padStart(8, "0");
 }
 export type Snap = { key: string; venue: Venue; candle_t: number; close_t: number; symbol: string; tf: TF; side: "long" | "short"; conf_band: string; conf_pct: number; others_agree: number; others_total: number; structure_ok: boolean;
-  signals: string[]; zone: number; entry_top: number; entry_bottom: number; entry_mid: number; sl: number; tp1: number; tp2: number; settings_hash: string };
+  signals: string[]; zone: number; entry_top: number; entry_bottom: number; entry_mid: number; sl: number; tp1: number; tp2: number; settings_hash: string; atr: number; rules: string };
 export const closedOnly = (c: Candle[], tf: TF, now = Date.now()) => c.filter((k) => k.t + TF_MS[tf] <= now);
 /** Setups that pass the default rule on the candle at index i (closed candles only). */
 export function snapshotsAt(c: Candle[], i: number, symbol: string, tf: TF, o: { venue?: Venue; settings?: Settings; maxLev?: number; tick?: number } = {}): Snap[] {
   const venue = o.venue ?? "hyperliquid";
   const s = o.settings ?? fwdSettings(); const win = c.slice(Math.max(0, i + 1 - WINDOW), i + 1); if (win.length < MIN_CANDLES) return [];
-  const hash = settingsHash(s); const out: Snap[] = [];
+  const hash = settingsHash(s); const out: Snap[] = []; let atr: number | null = null;
   for (const side of ["long", "short"] as const) {
     let st: Setup = scan(win, side, s, { maxLev: o.maxLev, mmr: mmrFor(venue, o.maxLev), costs: { spread: 0, feePct: feeFor(venue, s) } });
     if (!st.shown) continue; if (o.tick) st = roundSetup(st, (p, m) => roundTick(p, o.tick, m));
-    const t = win.at(-1)!.t;
+    const t = win.at(-1)!.t; atr ??= analyze(win, s, o.maxLev, mmrFor(venue, o.maxLev)).atr;
     st.zones.forEach((z) => out.push({ key: `${venue}|${symbol}|${tf}|${t}|${side}|${z.rank}|${hash}`, venue, candle_t: t, close_t: t + TF_MS[tf], symbol, tf, side, conf_band: st.band, conf_pct: st.confidence, others_agree: st.othersAgree, others_total: st.othersTotal, structure_ok: st.structureOk,
-      signals: st.signals.filter((g) => g.pass && g.weight > 0).map((g) => g.key), zone: z.rank, entry_top: z.top, entry_bottom: z.bottom, entry_mid: z.entry, sl: z.stop, tp1: z.t1, tp2: z.t2, settings_hash: hash }));
+      signals: st.signals.filter((g) => g.pass && g.weight > 0).map((g) => g.key), zone: z.rank, entry_top: z.top, entry_bottom: z.bottom, entry_mid: z.entry, sl: z.stop, tp1: z.t1, tp2: z.t2, settings_hash: hash, atr: atr!, rules: RULES }));
   }
   return out;
+}
+/** Rules version written on new snapshots (see version.js). */
+export const RULES = "v3";
+/** A new snapshot repeats the previous one for its key when entry midpoint and stop each moved ≤ this × ATR. */
+export const DEDUPE_ATR = 0.25;
+export function isRepeat(prev: { entry_mid: number; sl: number; status: string | null; candle_t?: number } | undefined, s: { entry_mid: number; sl: number; atr: number; candle_t?: number; tf?: TF }): boolean {
+  if (!prev || (prev.status != null && FINAL.includes(prev.status as Status))) return false;
+  // not resolved yet (e.g. inserted earlier in the same catch-up run) but already past the fill window → it expired
+  if ((prev.status == null || prev.status === "pending") && prev.candle_t != null && s.candle_t != null && s.tf && s.candle_t - prev.candle_t >= FILL_BARS * TF_MS[s.tf]) return false;
+  const tol = DEDUPE_ATR * s.atr; return Math.abs(s.entry_mid - prev.entry_mid) <= tol && Math.abs(s.sl - prev.sl) <= tol;
 }
 export type Status = "pending" | "expired" | "open" | "tp1_open" | "tp1" | "tp2" | "sl";
 export const FINAL: Status[] = ["expired", "tp1", "tp2", "sl"];
