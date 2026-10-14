@@ -34,3 +34,14 @@ export function shadowSummary(rows) {
 /** Unrealized R of an open trade (real or what-if) at live price px. Gross, before exit costs. Display only. */
 export function unrealR(t, px) { const entry = +t.entry, risk = +t.risk || Math.abs(entry - +t.sl); if (!(px > 0) || !(risk > 0)) return null; return ((t.side === "long" ? 1 : -1) * (px - entry)) / risk; }
 export function openWhatIfR(rows, trades, live) { let sum = 0, n = 0; for (const x of rows) { if (x.status !== "open") continue; const t = trades.find((y) => String(y.id) === x.id); const r = t && unrealR(t, live?.[t.market]?.px); if (r != null) { sum += r; n++; } } return { n, r: sum }; }
+/** MFE/MAE in R (research only, never used for exits/scoring). Conservative on the fill candle: it is SKIPPED, because inside one 1H candle we can't
+ * tell if its high/low came before or after the fill. Uses closed 1H candles that open at/after fill_t (fill_t = fill candle close) and before exit_t
+ * (exit_t = exit candle close, so the exit candle counts), or up to now for open trades (plus the live price if given). Gross R, no costs. */
+export function excursion(t, K, fillT, exitT, nowPx) {
+  if (fillT == null) return { mfe: null, mae: null }; const L = t.side === "long", entry = +t.entry, risk = +t.risk || Math.abs(entry - +t.sl); if (!(risk > 0)) return { mfe: null, mae: null };
+  let best = 0, worst = 0; const f = Number(fillT), e = exitT == null ? Infinity : Number(exitT);
+  const upd = (hi, lo) => { const a = ((L ? hi : lo) - entry) * (L ? 1 : -1) / risk, b = ((L ? lo : hi) - entry) * (L ? 1 : -1) / risk; best = Math.max(best, a); worst = Math.min(worst, b); };
+  for (const k of K) if (k.t >= f && k.t < e) upd(k.h, k.l);
+  if (exitT == null && nowPx > 0) upd(nowPx, nowPx);
+  return { mfe: best, mae: worst };
+}

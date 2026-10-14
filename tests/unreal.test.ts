@@ -8,3 +8,11 @@ describe("unrealized R (display only)", () => {
     expect(o.n).toBe(2); expect(o.r).toBeCloseTo(0, 6);
   });
 });
+import { excursion } from "../src/forward/shadow.js";
+describe("MFE/MAE (research only)", () => {
+  const t = { side: "long", entry: 100, sl: 90 }; const H = 3.6e6;
+  const K = [{ t: 0, h: 200, l: 50 }, { t: H, h: 110, l: 95 }, { t: 2 * H, h: 130, l: 70 }];
+  it("skips the fill candle, includes exit candle, stops at exit", () => { const e = excursion(t, K, H, 2 * H); expect(e.mfe).toBeCloseTo(1); expect(e.mae).toBeCloseTo(-0.5); });
+  it("open uses candles to now plus live", () => { const e = excursion(t, K, H, null, 135); expect(e.mfe).toBeCloseTo(3.5); expect(e.mae).toBeCloseTo(-3); });
+  it("short + unfilled", () => { expect(excursion({ side: "short", entry: 100, sl: 110 }, K, H, null).mfe).toBeCloseTo(3); expect(excursion(t, K, null, null).mfe).toBeNull(); });
+});
