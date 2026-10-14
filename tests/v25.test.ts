@@ -2,7 +2,7 @@ import { HlSocket } from "../src/api/live";
 import { listMarkets, roundTick } from "../src/api/markets";
 import { roundSetup, scan } from "../src/engine/scan";
 import { DEFAULTS } from "../src/engine/settings";
-import { countdown, nextEvent } from "../src/ui/Today";
+import { countdown, nextEvent, parsePulse } from "../src/ui/Today";
 class FakeWS { static all: FakeWS[] = []; readyState = 0; sent: any[] = []; onopen?: () => void; onmessage?: (e: any) => void; onclose?: () => void; onerror?: () => void;
   constructor(public url: string) { FakeWS.all.push(this); } send(m: string) { this.sent.push(JSON.parse(m)); } close() { this.readyState = 3; this.onclose?.(); }
   open() { this.readyState = 1; this.onopen?.(); } msg(o: object) { this.onmessage?.({ data: JSON.stringify(o) }); } }
@@ -85,4 +85,10 @@ describe("your liquidation vs stop", () => {
     const sp = lineSpecs(setup, 1, { liq: [{ price: 85700, long: 0, short: 3 }] } as any, { accent: "a", neg: "n", pos: "p", warn: "w" }, 85900);
     expect(sp.map((x) => x.title)).toEqual(expect.arrayContaining(["Your liq", "Shorts liq zone"])); expect(lineSpecs(setup, 1, null, { accent: "a", neg: "n", pos: "p", warn: "w" }).some((x) => x.title === "Your liq")).toBe(false);
   });
+});
+
+it("Today market pulse parses HL metaAndAssetCtxs", () => {
+  const j = [{ universe: [{ name: "BTC" }, { name: "ETH" }] }, [{ markPx: "110", prevDayPx: "100", funding: "0.0001" }, { markPx: "50", prevDayPx: "0", funding: "0" }]];
+  const p = parsePulse(j, ["BTC", "ETH", "DOGE"]); expect(p.map((x) => x.coin)).toEqual(["BTC", "ETH"]); expect(p[0].chg).toBeCloseTo(0.1); expect(p[1].chg).toBe(0);
+  expect(parsePulse(null)).toEqual([]);
 });

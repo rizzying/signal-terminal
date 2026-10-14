@@ -18,6 +18,8 @@ export const loadSnap = (ex: Exchange): WatchSnap | null => { try { return JSON.
 const OLD_BULK_DEFAULT = "BTC-USD, ETH-USD, SOL-USD";
 const EVERY = [0, 1, 5, 15, 30];
 const key = (ex: Exchange) => `sig.watch.${ex}`;
+/** Symbols on the user's watchlist for an exchange (Today reads this). Bulk falls back to BTC/ETH/SOL until the list is loaded once. */
+export function watchSymbols(ex: Exchange): string[] { const v = localStorage.getItem(key(ex)); const raw = ex === "bulk" && v === OLD_BULK_DEFAULT ? null : v; const l = raw ? raw.split(/[\s,]+/).filter(Boolean) : DEF[ex]; return l.length ? l : ["BTC-USD", "ETH-USD", "SOL-USD"]; }
 export function Watchlist({ settings, onOpen }: { settings: Settings; onOpen: (ex: Exchange, sym: string, tf: TF) => void }) {
   const [ex, setEx] = useState<Exchange>(() => (localStorage.getItem("sig.ex") as Exchange) || "hyperliquid");
   const [tf, setTf] = useState<TF>("4h");

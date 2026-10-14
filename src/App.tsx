@@ -66,7 +66,7 @@ export default function App() {
         {!ready ? <p className="dim small center" role="status">Loading…</p> : <>
         <Suspense fallback={<p className="dim small center" role="status">Loading…</p>}>
         {tab === "forward" && (labs.forward ? <ForwardView /> : <section className="card stack" data-labs-off><h2>Forward test</h2><p className="dim">This is a Labs feature. Turn on "Forward test" under Labs in Settings to see it.</p></section>)}
-        {tab === "today" && <TodayView settings={settings} go={setTab} />}
+        {tab === "today" && <TodayView settings={settings} go={setTab} onScan={(ex, sym, tf, dir) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); sessionStorage.setItem("sig.autoscan", dir); setTab("scan"); }} />}
         {tab === "scan" && <ScanView stratId={stratId} onPickStrategy={pickStrategy} settings={settings} theme={theme} onJournal={journal} />}
         {tab === "watch" && <Watchlist settings={settings} onOpen={(ex, sym, tf) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); setTab("scan"); }} />}
         {tab === "market" && <MarketView />}
@@ -77,7 +77,7 @@ export default function App() {
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}
         </Suspense></>}
       </main>
-      <footer className="foot dim small">Signal v2.7.2 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v2.7.3 · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import type { Settings } from "../engine/settings";
 import { db, type ChecklistItem } from "../journal/db";
 import { Chart } from "./Chart";
 import { AlertsCard, addAlert } from "./Alerts";
+import { copyText, setupText } from "./copySetup";
 import { StrategySelect } from "./StrategyPicker";
 import type { Strategy } from "../strategies";
 import { baseAsset } from "../api/funding";
@@ -67,6 +68,10 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
     if (!lastDir || loading || busy) return; const k = [data, settings]; if (ranFor.current && (ranFor.current as unknown[])[0] === data && (ranFor.current as unknown[])[1] === settings) return;
     ranFor.current = k; if (analysis && data.length >= MIN_CANDLES) run(lastDir, true); else if (data.length) setSetup(null);
   }, [data, settings, loading]);
+  // a Scan long/short tap on Today: run that side once the chart data is ready
+  const auto = useRef<Dir | null>((sessionStorage.getItem("sig.autoscan") as Dir) || null);
+  useEffect(() => { sessionStorage.removeItem("sig.autoscan"); }, []);
+  useEffect(() => { if (auto.current && analysis && !loading && !busy && marketsFor === ex) { const d = auto.current; auto.current = null; run(d); } }, [analysis, loading, busy, marketsFor, ex]);
   const saveChecklist = (c: ChecklistItem[]) => { setChecklist(c); db.set("checklist", c); };
   const { candle: liveC, mode: liveMode } = useLiveCandle(ex, sym, tf, marketsFor === ex);
   const last = liveC && data.length && liveC.t >= data.at(-1)!.t ? liveC : data.at(-1);
@@ -94,9 +99,9 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
         <button className="btn long" disabled={!analysis || !!busy} onClick={() => run("long")}>{busy === "long" ? "Scanning…" : "Scan long"}</button>
         <button className="btn short" disabled={!analysis || !!busy} onClick={() => run("short")}>{busy === "short" ? "Scanning…" : "Scan short"}</button>
       </div>
-      {setup && <Result lev={lev} setLev={setLevS} mmr={ex === "binance" ? null : mmrFor(ex, market?.maxLev)} maxLev={market?.maxLev} analysis={analysis} book={book} ex={ex} setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks, ...(ex === "binance" ? {} : { leverage: lev, liq: checkLiq(setup.zones[zone], setup.dir, lev, mmrFor(ex, market?.maxLev)).liq }) })} onAlert={() => { const z = setup.zones[zone]; addAlert({ exchange: ex, symbol: sym, kind: "zone", lo: z.bottom, hi: z.top, label: `${setup.dir} Zone ${z.rank} entry ${fmt(z.bottom)}–${fmt(z.top)}` }); }} threshold={settings.threshold} />}
+      {setup && <div className="scanside stack">{setup && <Result meta={{ market: market?.label ?? sym, exchange: EX.find((e) => e.id === ex)!.name, tf }} lev={lev} setLev={setLevS} mmr={ex === "binance" ? null : mmrFor(ex, market?.maxLev)} maxLev={market?.maxLev} analysis={analysis} book={book} ex={ex} setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks, ...(ex === "binance" ? {} : { leverage: lev, liq: checkLiq(setup.zones[zone], setup.dir, lev, mmrFor(ex, market?.maxLev)).liq }) })} onAlert={() => { const z = setup.zones[zone]; addAlert({ exchange: ex, symbol: sym, kind: "zone", lo: z.bottom, hi: z.top, label: `${setup.dir} Zone ${z.rank} entry ${fmt(z.bottom)}–${fmt(z.top)}` }); }} threshold={settings.threshold} />}<AlertsCard /></div>}
       {setup && Object.keys(cmp).length > 0 && <Compare cmp={cmp} current={ex} zone={zone} onPick={(e) => setEx(e)} dir={setup.dir} />}
-      <AlertsCard />
+      {!setup && <AlertsCard />}
       <div className="card">
         <div className="cardhead"><h2>My checklist</h2><span className="lbl">device-only</span></div>
         {setup ? <p className="dim small">Tick the rules that hold for this {setup.dir} setup. Compare against Signal's checks above.</p> : <p className="dim small">Your own rules. Run a scan to tick them next to Signal's checks.</p>}
@@ -110,9 +115,12 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
   );
 }
 
-function Result({ lev, setLev, mmr, maxLev, analysis, book, ex, setup, zone, setZone, onJournal, onAlert, threshold }: { lev: number; setLev: (n: number) => void; mmr: number | null; maxLev?: number; analysis?: Analysis | null; book: Book | null; ex: Exchange; setup: Setup; zone: number; setZone: (n: number) => void; onJournal: () => void; onAlert: () => void; threshold: number }) {
+function Result({ meta, lev, setLev, mmr, maxLev, analysis, book, ex, setup, zone, setZone, onJournal, onAlert, threshold }: { meta: { market: string; exchange: string; tf: string }; lev: number; setLev: (n: number) => void; mmr: number | null; maxLev?: number; analysis?: Analysis | null; book: Book | null; ex: Exchange; setup: Setup; zone: number; setZone: (n: number) => void; onJournal: () => void; onAlert: () => void; threshold: number }) {
   const [alerted, setAlerted] = useState<number | null>(null);
-  const s = setup;
+  const s = setup; const [toast, setToast] = useState<string | null>(null);
+  const pick = async (i: number) => { setZone(i); const z = s.zones[i]; const c = mmr != null ? checkLiq(z, s.dir, lev, mmr, maxLev) : null;
+    const ok = await copyText(setupText({ ...meta, dir: s.dir, zone: z, confidence: s.confidence, band: s.band, lev: c ? lev : null, liq: c?.liq ?? null, liqBeforeStop: c?.beforeStop, at: Date.now() }));
+    setToast(ok ? `Copied Zone ${i + 1} setup` : "Zone selected. Copy blocked by the browser"); setTimeout(() => setToast(null), 1800); };
   return (
     <div className={`card result ${s.dir} rise`}>
       <div className="cardhead">
@@ -127,9 +135,10 @@ function Result({ lev, setLev, mmr, maxLev, analysis, book, ex, setup, zone, set
         <NumField id="lev" label="Your leverage" min={1} max={maxLev ?? 100} step={1} steppers value={lev} onCommit={setLev} />
         <span className="dim small">× · for the liquidation check below (est., isolated margin, maintenance {(mmr * 100).toFixed(2)}%)</span></div>
         : <p className="dim small">Spot market: no leverage, no liquidation.</p>}
+      {toast && <div className="toast" role="status">{toast}</div>}
       <div className="zones" role="tablist" aria-label="Entry zones">
         {s.zones.map((z, i) => (
-          <button key={i} role="tab" aria-selected={zone === i} className={`zone ${zone === i ? "on" : ""}`} onClick={() => setZone(i)}>
+          <button key={i} role="tab" aria-selected={zone === i} className={`zone ${zone === i ? "on" : ""}`} onClick={() => pick(i)} title="Select this zone and copy the setup">
             <div className="row between"><span className="lbl">Zone {z.rank} · {z.name}</span>{z.ready ? <span className="badge long">In zone</span> : <span className="badge">Wait</span>}</div>
             <dl className="zkv">
               {([["Entry", `${fmt(z.bottom)} – ${fmt(z.top)}`, ""], ["Median", fmt(z.entry), ""], ["Stop", fmt(z.stop), "neg"], ["TP1", fmt(z.t1), "pos"], ["TP2", fmt(z.t2), "pos"], ["R:R TP1 / TP2", `${z.rr1.toFixed(1)}R / ${z.rr2.toFixed(1)}R`, ""], ...(mmr != null ? [[`Your liq (${lev}×)`, fmt(checkLiq(z, s.dir, lev, mmr).liq), checkLiq(z, s.dir, lev, mmr).beforeStop ? "neg" : ""]] : [])] as const).map(([k, v, c]) => <div className="zr" key={k}><dt>{k}</dt><dd className={c}>{v}</dd></div>)}
