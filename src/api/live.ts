@@ -38,3 +38,43 @@ export class HlSocket {
 let shared: HlSocket | null = null;
 export const hlSocket = () => (shared ??= new HlSocket());
 export const wsCandle = (d: any): Candle => ({ t: d.t, o: +d.o, h: +d.h, l: +d.l, c: +d.c, v: +d.v });
+
+// Bulk public WebSocket: ticker (lastPrice every ~200ms). Bulk's candle feeds (REST and WS) publish 1–2 candles late,
+// so the forming candle is built here from ticker prices. Server pings are answered by the browser automatically.
+export const BULK_WS = "wss://mainnet-ws1.bulk.trade";
+export class BulkTicker {
+  private ws: WebSocket | null = null; private ls = new Map<string, Set<(px: number, t: number) => void>>(); private retry = 0; private timer: ReturnType<typeof setTimeout> | null = null;
+  private statusLs = new Set<(s: LiveStatus) => void>(); status: LiveStatus = "off"; private hidden = false;
+  constructor(private url = BULK_WS, private Ctor: typeof WebSocket | undefined = typeof WebSocket !== "undefined" ? WebSocket : undefined, doc: Document | undefined = typeof document !== "undefined" ? document : undefined) {
+    doc?.addEventListener("visibilitychange", () => { this.hidden = doc.hidden; if (doc.hidden) this.close(); else this.ensure(); });
+  }
+  private set(s: LiveStatus) { this.status = s; this.statusLs.forEach((f) => f(s)); }
+  onStatus(f: (s: LiveStatus) => void) { this.statusLs.add(f); f(this.status); return () => this.statusLs.delete(f); }
+  private send(m: object) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify(m)); }
+  subscribe(symbol: string, f: (px: number, t: number) => void) {
+    let s = this.ls.get(symbol); if (!s) { s = new Set(); this.ls.set(symbol, s); this.send({ method: "subscribe", subscription: [{ type: "ticker", symbol }] }); }
+    s.add(f); this.ensure();
+    return () => { const x = this.ls.get(symbol); if (!x) return; x.delete(f); if (!x.size) { this.ls.delete(symbol); this.send({ method: "unsubscribe", topic: `ticker.${symbol}` }); if (!this.ls.size) this.close(); } };
+  }
+  private ensure() {
+    if (this.ws || this.timer || this.hidden || !this.ls.size || !this.Ctor) return;
+    this.set("connecting"); let ws: WebSocket; try { ws = new this.Ctor(this.url); } catch { return this.later(); } this.ws = ws;
+    ws.onopen = () => { this.retry = 0; this.set("live"); this.send({ method: "subscribe", subscription: [...this.ls.keys()].map((symbol) => ({ type: "ticker", symbol })) }); };
+    ws.onmessage = (ev) => { let m: any; try { m = JSON.parse(String(ev.data)); } catch { return; }
+      const k = m?.type === "ticker" ? m.data?.ticker : null; const px = k ? +k.lastPrice : NaN; if (!k || !(px > 0)) return;
+      this.ls.get(k.symbol)?.forEach((f) => f(px, Date.now())); };
+    ws.onclose = () => { this.ws = null; if (!this.hidden && this.ls.size) this.later(); else this.set("off"); };
+    ws.onerror = () => { try { ws.close(); } catch { /* ignore */ } };
+  }
+  private later() { this.set("connecting"); const wait = Math.min(30_000, 1000 * 2 ** this.retry++) * (0.8 + Math.random() * 0.4); this.timer = setTimeout(() => { this.timer = null; this.ensure(); }, wait); }
+  close() { if (this.timer) clearTimeout(this.timer); this.timer = null; const w = this.ws; this.ws = null; if (w) { w.onclose = null; try { w.close(); } catch { /* ignore */ } } this.set("off"); }
+}
+let bulkShared: BulkTicker | null = null;
+export const bulkTicker = () => (bulkShared ??= new BulkTicker());
+/** Forming candle for the bucket containing `now`, built from ticker prices. Same bucket → extend; new bucket → open at the previous close. */
+export function tickCandle(prev: Candle | null, seed: Candle | undefined, px: number, now: number, tfMs: number): Candle {
+  const t = Math.floor(now / tfMs) * tfMs;
+  if (prev && prev.t === t) return { ...prev, h: Math.max(prev.h, px), l: Math.min(prev.l, px), c: px };
+  if (seed && seed.t === t) return { ...seed, h: Math.max(seed.h, px), l: Math.min(seed.l, px), c: px };
+  const o = prev?.c ?? seed?.c ?? px; return { t, o, h: Math.max(o, px), l: Math.min(o, px), c: px, v: 0 };
+}
