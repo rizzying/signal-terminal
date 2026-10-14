@@ -31,3 +31,6 @@ export function shadowSummary(rows) {
   const filled = rows.filter((s) => s.fill_t != null), done = rows.filter((s) => s.r != null);
   return { cancelled: rows.length, filled: filled.length, closed: done.length, netR: done.reduce((a, s) => a + s.r, 0), open: rows.filter((s) => s.status === "open").length, pending: rows.filter((s) => s.status === "waiting").length };
 }
+/** Unrealized R of an open trade (real or what-if) at live price px. Gross, before exit costs. Display only. */
+export function unrealR(t, px) { const entry = +t.entry, risk = +t.risk || Math.abs(entry - +t.sl); if (!(px > 0) || !(risk > 0)) return null; return ((t.side === "long" ? 1 : -1) * (px - entry)) / risk; }
+export function openWhatIfR(rows, trades, live) { let sum = 0, n = 0; for (const x of rows) { if (x.status !== "open") continue; const t = trades.find((y) => String(y.id) === x.id); const r = t && unrealR(t, live?.[t.market]?.px); if (r != null) { sum += r; n++; } } return { n, r: sum }; }
