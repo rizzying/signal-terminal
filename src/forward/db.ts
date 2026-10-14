@@ -20,3 +20,16 @@ export const SCHEMA: string[] = [
   `create table if not exists fwd_runs (id bigserial primary key, at timestamptz not null default now(), inserted int not null, resolved int not null, errors text)`,
 ];
 export async function ensureSchema(q: Q) { for (const s of SCHEMA) await q(s); }
+// v3.0 virtual trader (idempotent; never drops or deletes anything)
+export const PAPER_SCHEMA: string[] = [
+  `create table if not exists fwd_trades (id bigserial primary key, key text unique not null, strategy text not null, rules_hash text not null, market text not null, side text not null,
+    status text not null, placed_t bigint not null, entry float8 not null, sl float8 not null, tp float8 not null, risk float8 not null, conf int, replaced int not null default 0,
+    fill_t bigint, exit_t bigint, exit_px float8, exit_reason text, bars int not null default 0, r_gross float8, cost_r float8, funding_r float8, funding_src text, r_net float8,
+    created_at timestamptz not null default now(), updated_at timestamptz not null default now())`,
+  `create index if not exists fwd_trades_live on fwd_trades (strategy, market, status)`,
+  `create table if not exists fwd_events (id bigserial primary key, strategy text not null, market text not null, trade_key text references fwd_trades(key), kind text not null, t bigint not null, data jsonb, created_at timestamptz not null default now())`,
+  `create unique index if not exists fwd_events_once on fwd_events (strategy, market, kind, t, coalesce(trade_key, ''))`,
+  `create table if not exists fwd_trader (strategy text not null, market text not null, last_t bigint not null, primary key (strategy, market))`,
+  `alter table fwd_runs add column if not exists paper text`,
+];
+export async function ensurePaperSchema(q: Q) { await ensureSchema(q); for (const s of PAPER_SCHEMA) await q(s); }

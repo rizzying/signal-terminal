@@ -183,3 +183,20 @@ main{min-height:100vh}
 .hfilter{position:relative;display:inline-block}.hfilter .btn.on{box-shadow:0 0 0 1px var(--accent)}.hpop{position:absolute;z-index:40;top:calc(100% + 6px);left:0;min-width:15rem;max-height:60vh;overflow:auto;display:grid;gap:10px;padding:12px;text-transform:none;letter-spacing:0;font-weight:400;text-align:left}
 .hpop fieldset{border:0;margin:0;padding:0;display:grid;gap:4px}.hpop fieldset:has(.hopt:nth-child(6)){grid-template-columns:1fr 1fr}.hpop legend{grid-column:1/-1;margin-bottom:2px}.hopt{display:flex;gap:6px;align-items:center;font-size:13px;white-space:nowrap}.hopt .mono{margin-left:auto}
 .zfilters-m{display:none;margin-bottom:10px}@media (max-width:47.99rem){.zfilters-m{display:flex}.ztable thead .hfilter{display:none}.hpop{position:fixed;left:12px;right:12px;top:auto;bottom:calc(84px + env(safe-area-inset-bottom));max-height:60vh}}
+/* v3.0 forward test */
+.forward .pbars { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.forward .ptrack { height: 8px; border-radius: 99px; background: var(--line, #2a2a2a); overflow: hidden; margin-top: 4px; }
+.forward .ptrack i { display: block; height: 100%; background: var(--accent, #5b8cff); }
+.forward .stat .badge { align-self: flex-start; }
+.forward .fgrid { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+.forward .eqr { width: 100%; height: 160px; }
+.forward .eqr path { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.forward .eqr path.up { stroke: var(--pos, #2ecc71); } .forward .eqr path.down { stroke: var(--neg, #ff5c5c); }
+.forward .eqr .zero { stroke: #555; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.forward .eqr .kill { stroke: var(--neg, #ff5c5c); stroke-dasharray: 4 4; opacity: .6; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.forward .nowrow { padding: 6px 0; border-bottom: 1px solid var(--line, #222); gap: 8px; flex-wrap: wrap; }
+.forward .evlist { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 2px; }
+.forward details > summary { cursor: pointer; padding: 4px 0; }
+.forward details[open] > summary { margin-bottom: 12px; }
+.badge.v-kill { background: rgba(255,92,92,.18); color: var(--neg, #ff5c5c); } .badge.v-promote { background: rgba(46,204,113,.18); color: var(--pos, #2ecc71); }
+@media (max-width: 760px) { .forward .pbars, .forward .fgrid { grid-template-columns: 1fr; } }

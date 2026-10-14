@@ -58,3 +58,22 @@ export async function runJob(q: Q, o: { now?: number; fetch?: Fetch; markets?: (
   if (errors.length) log("errors: " + errors.join("; "));
   return { inserted, resolved, errors };
 }
+/** v3.0: no new v4 snapshots. Only feeds that still have unresolved rows are fetched, and those rows are resolved from closed candles. */
+export async function resolveLegacy(q: Q, o: { now?: number; fetch?: Fetch; log?: (s: string) => void } = {}) {
+  const now = o.now ?? Date.now(); const log = o.log ?? console.log; const fetch: Fetch = o.fetch ?? ((v, s, tf, n) => fetchCandles(v, s, tf, n));
+  const errors: string[] = []; let resolved = 0;
+  const open = await q(`select s.id, s.venue, s.symbol, s.tf, s.candle_t, s.side, s.entry_top, s.entry_bottom, s.sl, s.tp1, s.tp2, r.status from fwd_snapshots s left join fwd_results r on r.snapshot_id = s.id
+    where r.status is null or not (r.status = any($1))`, [FINAL]);
+  const feeds = new Map<string, any[]>(); for (const x of open) { const k = `${x.venue}|${x.symbol}|${x.tf}`; feeds.set(k, [...(feeds.get(k) ?? []), x]); }
+  const work = [...feeds.entries()]; let next = 0;
+  const one = async ([k, rows]: [string, any[]]) => { const [v, sym, tf] = k.split("|") as [Venue, string, TF];
+    try { const from = Math.min(...rows.map((x) => Number(x.candle_t))); const need = Math.min(5000, Math.ceil((now - from) / TF_MS[tf]) + 3);
+      const after = closedOnly(await fetch(v, sym, tf, need), tf, now);
+      for (const x of rows) { const res = resolveSnap({ candle_t: Number(x.candle_t), side: x.side, entry_top: +x.entry_top, entry_bottom: +x.entry_bottom, sl: +x.sl, tp1: +x.tp1, tp2: +x.tp2 }, after);
+        if (res.status === (x.status ?? null)) continue;
+        await q(`insert into fwd_results (snapshot_id,status,fill_t,tp1_t,done_t,bars) values ($1,$2,$3,$4,$5,$6) on conflict (snapshot_id) do update set status=excluded.status, fill_t=excluded.fill_t, tp1_t=excluded.tp1_t, done_t=excluded.done_t, bars=excluded.bars, updated_at=now()`,
+          [x.id, res.status, res.fill_t, res.tp1_t, res.done_t, res.bars]); resolved++; }
+    } catch (e: any) { errors.push(`legacy ${k}: ${String(e.message ?? e).slice(0, 120)}`); } };
+  await Promise.all(Array.from({ length: 4 }, async () => { while (next < work.length) await one(work[next++]); }));
+  log(`legacy log: ${open.length} unresolved rows on ${work.length} feeds, ${resolved} changed`); return { resolved, errors };
+}

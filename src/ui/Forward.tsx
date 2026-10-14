@@ -32,9 +32,9 @@ function Breakdown({ name, rows }: { name: string; rows: ({ key: string } & Scor
       <td data-label="Setups" className="num">{r.n}</td><td data-label="Resolved" className="num">{r.resolved}</td><td data-label="Win rate" className="num">{rateText(r.win, r.resolved)}</td>
       <td data-label="Avg R" className="num">{r.avgR == null ? "–" : r.avgR.toFixed(2)}</td><td data-label="Expired" className="num">{rateText(r.expired, r.filled + r.expired)}</td></tr>)}</tbody></table></div>;
 }
-type Group = { key: "venue" | "symbol" | "tf" | "side" | "zone" | "status"; title: string; opts: [string, string][] };
+type Group = { key: string; title: string; opts: [string, string][] };
 /** Spreadsheet-style header filter: multi-select checkboxes with counts, synced with the filter bar (same state). */
-export function HeaderFilter({ label, groups, f, counts, set }: { label: string; groups: Group[]; f: Filters; counts?: Record<string, Record<string, number>>; set: (k: Group["key"], v: string) => void }) {
+export function HeaderFilter({ label, groups, f, counts, set }: { label: string; groups: Group[]; f: Record<string, string | undefined>; counts?: Record<string, Record<string, number>>; set: (k: any, v: string) => void }) {
   const [open, setOpen] = useState(false); const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { if (!open) return; const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); }; addEventListener("mousedown", h); return () => removeEventListener("mousedown", h); }, [open]);
   const active = groups.reduce((n, g) => n + (f[g.key] ? f[g.key]!.split(",").length : 0), 0);
@@ -75,7 +75,8 @@ function Card({ s, px, prevPx, now }: { s: SetupCard; px?: number; prevPx?: numb
       </div>; })}</div>
   </article>;
 }
-export function ForwardView() {
+/** The old per-candle log (rules v1–v4), research only: no new rows since v3.0. */
+export function SignalLog() {
   const [ver, setVer] = useState<string>(LATEST); const [f, setF] = useState<Filters>({}); const [d, setD] = useState<Data | null>(null); const [err, setErr] = useState("");
   useEffect(() => { let live = true; setErr(""); fetch(`/api/forward?${qs(ver, f)}`).then((r) => r.json()).then((x) => live && setD(x)).catch(() => live && setErr("Couldn't load the forward test right now.")); return () => { live = false; }; }, [ver, f]);
   // live prices for setups still waiting to fill: Hyperliquid mids in one call, Bulk book mids for up to 8 symbols
@@ -96,10 +97,10 @@ export function ForwardView() {
   const fc = d.facets ?? { venue: [], symbol: [], tf: [] };
   SetupCtx.groups = [{ key: "venue", title: "Venue", opts: fc.venue.map((v) => [v, VN[v] ?? v]) }, { key: "symbol", title: "Coin", opts: fc.symbol.map((v) => [v, v]) }, { key: "tf", title: "Timeframe", opts: fc.tf.map((v) => [v, v.toUpperCase()]) }, { key: "side", title: "Side", opts: [["long", "Long"], ["short", "Short"]] }];
   return (
-    <section className="stack rise forward">
+    <section className="stack forward">
       <div className="card stack">
-        <div className="cardhead"><h2>Forward test</h2><span className="row gap"><span className="badge">live · still growing</span><a className="btn sm" href={`/api/forward?format=csv&${qs(ver, f)}`} download>Export CSV</a></span></div>
-        <p className="small">Every hour, Signal scans every Bulk market that is trading (and the same coin on Hyperliquid) on 15m, 1H, 4H and 1D. When the default strategy finds a setup, it saves all 3 zones once and never edits them, then watches what price does next.</p>
+        <div className="cardhead"><h2>Signal log (research)</h2><span className="row gap"><span className="badge">frozen · no new rows</span><a className="btn sm" href={`/api/forward?format=csv&${qs(ver, f)}`} download>Export CSV</a></span></div>
+        <p className="small"><b>Not the forward test.</b> Since v3.0 nothing new is logged here; rows still open keep resolving and nothing is deleted. Until then, every hour Signal scanned every Bulk market that is trading (and the same coin on Hyperliquid) on 15m, 1H, 4H and 1D. and saved all 3 zones of every setup.</p>
         <p className="dim small"><b>Win</b> = TP1 reached after filling (all-in on TP1). <b>Loss</b> = stop first (a stop and a target in the same candle counts as a stop). <b>Expired</b> = price never reached the zone within 24 candles. Average R is after taker fees on both sides. Only finished candles are used. Real, unseen data, but young: small numbers swing a lot. Not financial advice.</p>
         <div className="row gap wrap"><label className="lbl" htmlFor="fwd-ver">Rules version</label>
           <select id="fwd-ver" className="input" value={ver} onChange={(e) => setVer(e.target.value)}>{[...VERSIONS, "all"].map((v) => { const n = v === "all" ? d.versions?.reduce((a, x) => a + x.n, 0) : d.versions?.find((x) => x.version === v)?.n; return <option key={v} value={v}>{(VERSION_LABEL as Record<string, string>)[v]} ({n ?? 0})</option>; })}</select>
@@ -122,6 +123,75 @@ export function ForwardView() {
         <h3>Latest setups <span className="dim small">({Math.min(40, d.setups?.length ?? 0)} newest)</span></h3>
         <div className="fcards">{d.setups!.map((x) => <Card key={`${x.venue}|${x.symbol}|${x.tf}|${x.side}|${x.candle_t}`} s={x} px={px[`${x.venue}|${x.symbol}`]} prevPx={prev.current[`${x.venue}|${x.symbol}`]} now={now} />)}</div>
       </>}
+    </section>
+  );
+}
+
+// ───────── v3.0: the forward test is a virtual trader running one frozen strategy ─────────
+type PT = { key: string; market: string; side: "long" | "short"; status: string; placed_t: number; entry: number; sl: number; tp: number; risk: number; replaced: number; fill_t: number | null; exit_t: number | null; exit_px: number | null; exit_reason: string | null; bars: number; cost_r: number | null; funding_r: number | null; funding_src: string | null; r_net: number | null };
+type PScore = { n: number; pending: number; open: number; cancelled: number; expired: number; filled: number; fillRate: number | null; winRate: number | null; expR: number | null; ciLo: number | null; ciHi: number | null; pf: number | null; maxDdR: number; totalR: number; verdict: { key: string; label: string; why: string }; equity: { t: number; r: number }[] };
+type PData = { configured: boolean; error?: string; strategy?: { id: string; name: string; rulesHash: string; markets: string[] }; lastRun?: { at: string; paper?: string } | null; cursor?: { market: string; last_t: number }[];
+  score?: PScore; counts?: Record<string, Record<string, number>>; total?: number; trades?: PT[]; events?: { market: string; trade_key: string | null; kind: string; t: number; data: any }[]; today?: Record<string, { r: number; hit: boolean; limit: number }> };
+const r2 = (x: number | null, d = 2) => (x == null || !Number.isFinite(x) ? "–" : `${x >= 0 ? "+" : ""}${x.toFixed(d)}`);
+const PSTAT: Record<string, string> = { pending: "Pending order", open: "Open", tp: "TP", sl: "SL", cancelled: "Cancelled", expired: "Expired" };
+const pst = (t: PT) => (t.status === "closed" ? (t.exit_reason === "tp" ? "tp" : "sl") : t.status);
+const SPEC_URL = "https://github.com/rizzying/signal-terminal/blob/main/docs/FORWARD_SPEC.md";
+function Bar({ n, of, label }: { n: number; of: number; label: string }) {
+  return <div className="pbar"><div className="row between small"><span>{label}</span><b className="mono">{Math.min(n, of)} / {of}</b></div><div className="ptrack" role="progressbar" aria-valuenow={n} aria-valuemax={of} aria-label={label}><i style={{ width: `${Math.min(100, (100 * n) / of)}%` }} /></div></div>;
+}
+function Equity({ pts }: { pts: { t: number; r: number }[] }) {
+  if (!pts.length) return <p className="note">The equity curve starts with the first closed trade.</p>;
+  const ys = [0, ...pts.map((p) => p.r)]; const lo = Math.min(...ys, -1), hi = Math.max(...ys, 1); const W = 600, Hh = 160, x = (i: number) => (i / Math.max(1, pts.length)) * W, y = (v: number) => Hh - ((v - lo) / (hi - lo)) * Hh;
+  const d = ys.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  return <svg className="eqr" viewBox={`0 0 ${W} ${Hh}`} preserveAspectRatio="none" role="img" aria-label={`Equity ${r2(pts.at(-1)!.r)}R after ${pts.length} trades`}>
+    <line x1="0" x2={W} y1={y(0)} y2={y(0)} className="zero" /><path d={d} className={pts.at(-1)!.r >= 0 ? "up" : "down"} /></svg>;
+}
+export function ForwardView() {
+  const [f, setF] = useState<Record<string, string | undefined>>({}); const [d, setD] = useState<PData | null>(null); const [err, setErr] = useState(""); const [log, setLog] = useState(false);
+  const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]).toString();
+  useEffect(() => { let live = true; setErr(""); fetch(`/api/paper?${q}`).then((r) => r.json()).then((x) => live && setD(x)).catch(() => live && setErr("Couldn't load the forward test right now.")); return () => { live = false; }; }, [q]);
+  const set = (k: string, v: string) => setF((x) => ({ ...x, [k]: v || undefined }));
+  if (err) return <section className="card"><p className="alert">{err}</p></section>;
+  if (!d) return <section className="card"><p className="dim" role="status">Loading…</p></section>;
+  if (!d.configured || d.error) return <section className="card stack"><h2>Forward test</h2><p className="dim">{d.error ?? "The forward test is being set up."}</p></section>;
+  const st = d.strategy!, s = d.score!; const live = (d.trades ?? []).filter((t) => t.status === "pending" || t.status === "open"); const tab = f.tab ?? "all";
+  const small = s.n < 30; const V = s.verdict;
+  const mk: [string, string][] = st.markets.map((m) => [m, m.replace(/USDT$/, "")]);
+  const hf = (label: string, groups: Group[]) => <HeaderFilter label={label} groups={groups} f={f} counts={d.counts} set={set} />;
+  const tradeG: Group[] = [{ key: "market", title: "Market", opts: mk }, { key: "side", title: "Side", opts: [["long", "Long"], ["short", "Short"]] }]; const statG: Group[] = [{ key: "status", title: "Status", opts: Object.entries(PSTAT) }];
+  const stats: [string, string, string?][] = [
+    ["Closed trades", `${s.n}`, `${s.open} open · ${s.pending} pending`],
+    ["Expectancy (R, after costs)", s.expR == null ? "–" : `${r2(s.expR)}R`, s.ciLo == null ? "95% CI after 2 trades" : `95% CI ${r2(s.ciLo)} to ${r2(s.ciHi)}R`],
+    ["Profit factor", s.pf == null ? "–" : s.pf === Infinity || s.pf === null ? "∞" : s.pf.toFixed(2)],
+    ["Max drawdown", `${s.maxDdR.toFixed(2)}R`, "stat only"],
+    ["Fill rate", s.fillRate == null ? "–" : `${Math.round(100 * s.fillRate)}%`, `${s.filled} filled · ${s.cancelled} cancelled · ${s.expired} expired`],
+    ["Win rate", s.winRate == null ? "–" : `${Math.round(100 * s.winRate)}%`, `total ${r2(s.totalR)}R`]];
+  return (
+    <section className="stack rise forward">
+      <div className="card stack">
+        <div className="cardhead"><h2>Forward test · {st.name}</h2><span className="row gap"><span className={`badge v-${V.key}`} title={V.why}>{V.label}</span><a className="btn sm" href={`/api/paper?format=csv&${q}`} download>Export CSV</a></span></div>
+        <p className="small">One frozen strategy, paper-traded like a real account: a virtual trader per market (<b>{mk.map((m) => m[1]).join(", ")}</b>, Binance <b>spot</b> 1H candles) with at most one resting limit order and one position. Zone 2 entry, stop beyond the zone, all out at <b>3R</b>. A moved setup cancels and replaces the order; an order that never fills is no trade.</p>
+        <p className="dim small">Fills need price to trade <i>through</i> the entry by max(1 tick, 0.02%). Costs: Binance futures maker 0.02% / taker 0.05%, 0.02% spread and 0.05% slippage on stops, plus funding. Stop and target in one candle = stop. Rules hash <code>{st.rulesHash}</code> · <a href={SPEC_URL} target="_blank" rel="noreferrer">spec</a> · {st.id}{d.lastRun && <> · last run {wib(d.lastRun.at)}</>}</p>
+        <div className="pbars"><Bar n={s.n} of={30} label="First read (30 closed trades)" /><Bar n={s.n} of={100} label="Decision (100 closed trades)" /></div>
+        <p className="small"><b>{V.label}:</b> {V.why}. Kill: upper CI below 0 after 30 trades. Promote: lower CI above 0 at 100 trades. Daily limit: a market that loses 3R in a WIB day cancels its order and pauses until midnight WIB (open positions run on).</p>
+      </div>
+      <div className="statrow">{stats.map(([k, v, sub]) => <div key={k} className="card stat"><span className="lbl">{k}</span><b className="mono">{v}</b>{sub && <span className="dim small">{sub}</span>}{small && k !== "Closed trades" && s.n > 0 && <span className="badge">small sample</span>}</div>)}</div>
+      <div className="fgrid">
+        <div className="card"><h3>Equity (R, closed trades)</h3><Equity pts={s.equity} /></div>
+        <div className="card"><h3>Now</h3>{st.markets.map((m) => { const t = live.find((x) => x.market === m); const td = d.today?.[m]; return <div key={m} className="row between nowrow"><b>{m.replace(/USDT$/, "")} <span className={`mono small ${td && td.r < 0 ? "neg" : td && td.r > 0 ? "pos" : "dim"}`} title="Realized R today (WIB)">today {r2(td?.r ?? 0)}R</span>{td?.hit && <span className="badge v-kill" title="Lost 3R today: no new orders until 00:00 WIB">daily limit hit</span>}</b>{t ? <span className="small">{t.status === "open" ? "Position" : "Limit order"} <span className={`badge ${t.side}`}>{t.side}</span> @ <b className="mono">{fmt(t.entry)}</b> · SL <span className="neg mono">{fmt(t.sl)}</span> · TP <span className="pos mono">{fmt(t.tp)}</span>{t.replaced ? ` · moved ${t.replaced}×` : ""}</span> : <span className="dim small">{td?.hit ? "paused until 00:00 WIB" : "flat, no setup"}</span>}</div>; })}
+          {!!d.events?.length && <><h4 className="lbl">Latest events</h4><ul className="evlist small">{d.events.slice(0, 8).map((e, i) => <li key={i}><span className="dim">{wib(e.t)}</span> {e.market.replace(/USDT$/, "")} <b>{e.kind === "limit" ? "daily limit hit" : e.kind}</b>{e.kind === "replace" ? ` → ${fmt(e.data?.to?.entry)}` : e.kind === "place" ? ` ${e.data?.side} @ ${fmt(e.data?.entry)}` : e.kind === "close" ? ` ${e.data?.reason} ${r2(e.data?.r_net)}R` : ""}</li>)}</ul></>}</div>
+      </div>
+      <div className="seg ftabs" role="tablist" aria-label="Trades">{[["filled", "Filled"], ["notfilled", "Not filled"], ["cancelled", "Cancelled"], ["expired", "Expired"], ["all", "All"]].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => set("tab", k === "all" ? "" : k)}>{l} <span className="mono dim">{d.counts?.tab?.[k] ?? 0}</span></button>)}</div>
+      <div className="card">
+        <div className="zfilters-m row gap wrap"><span className="lbl">Filter</span>{hf("Trade", tradeG)}{hf("Status", statG)}</div>
+        {!d.trades?.length ? <p className="note">No trades in this view yet. Orders appear after the next hourly run when a Zone 2 setup shows.</p> :
+        <table className="rt ztable"><thead><tr><th>Placed</th><th>{hf("Trade", tradeG)}</th><th>Entry</th><th>Stop</th><th>TP (3R)</th><th>Filled</th><th>Closed</th><th>{hf("Status", statG)}</th><th>Result</th></tr></thead>
+          <tbody>{d.trades.map((t) => <tr key={t.key}><td data-label="Placed">{wib(Number(t.placed_t))}</td><td data-label="Trade"><b>{t.market.replace(/USDT$/, "")}</b> <span className={`badge ${t.side}`}>{t.side}</span>{t.replaced ? <span className="dim small"> moved {t.replaced}×</span> : null}</td>
+            <td data-label="Entry" className="num">{fmt(+t.entry)}</td><td data-label="Stop" className="num neg">{fmt(+t.sl)}</td><td data-label="TP" className="num pos">{fmt(+t.tp)}</td>
+            <td data-label="Filled">{t.fill_t ? wib(Number(t.fill_t)) : "–"}</td><td data-label="Closed">{t.exit_t && t.status === "closed" ? <>{wib(Number(t.exit_t))} @ {fmt(+t.exit_px!)}</> : "–"}</td><td data-label="Status">{PSTAT[pst(t)]}</td>
+            <td data-label="Result" className={`num ${t.r_net == null ? "" : +t.r_net >= 0 ? "pos" : "neg"}`} title={t.r_net == null ? "" : `costs ${(+t.cost_r!).toFixed(3)}R · funding ${(+t.funding_r!).toFixed(3)}R${t.funding_src === "hl-proxy" ? " (Hyperliquid proxy)" : ""}`}>{t.r_net == null ? "–" : `${r2(+t.r_net)}R`}</td></tr>)}</tbody></table>}
+      </div>
+      <details className="card" open={log} onToggle={(e) => setLog((e.target as HTMLDetailsElement).open)}><summary><b>Signal log (research)</b> <span className="dim small">old per-candle zone log, rules v1–v4 · not counted as trades</span></summary>{log && <SignalLog />}</details>
     </section>
   );
 }
