@@ -2,9 +2,10 @@
 // @ts-ignore node types are not in the app tsconfig
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { step, settle, tradesThrough, buffer, rulesHash, SPEC, STRATEGY, type State, type Plan, type Trade } from "../src/forward/trader";
+import { step, settle, tradesThrough, buffer, rulesHash, SPEC, STRATEGY, LEGACY_SPEC, BOOKS, type State, type Plan, type Trade } from "../src/forward/trader";
+import { BOOK_HASH } from "../src/forward/books.js";
 import { paperJob } from "../src/forward/paperJob";
-import { meanCI, maxDdR, scorecard, verdict, tCrit, filterTrades, tradeCounts, parseTradeFilters, tradesCsv, today, parseTradeId, tradeId } from "../src/forward/paper.js";
+import { meanCI, maxDdR, scorecard, scoreboards, verdict, tCrit, filterTrades, tradeCounts, parseTradeFilters, tradesCsv, today, parseTradeId, tradeId } from "../src/forward/paper.js";
 import { wibDay } from "../src/forward/trader";
 import { wibRange, type Stmt } from "../src/forward/paperJob";
 const H = 3.6e6, M = "BTCUSDT";
@@ -20,13 +21,20 @@ it("order lifecycle: place → fill → TP; one trade; no new order while the po
   expect(r.cl[0].r_net!).toBeLessThan(2); // maker fees cost something
   expect(r.st.order?.placed_t).toBe(4 * H); // re-armed only after the close
 });
-it("cancel/replace: a moved setup replaces the same trade (event, not a new trade); setup gone cancels = no trade; expiry after 24 bars", () => {
-  let r = run(flat, [[k(0, 102, 103, 101, 102), [L]], [k(1, 102, 103, 101, 102), [{ ...L, entry: 100.5, sl: 98.5 }]], [k(2, 102, 103, 101, 102), [{ ...L, entry: 100.55, sl: 98.5 }]]]);
-  expect(r.ev.map((e) => e.kind)).toEqual(["place", "replace"]); // the 0.05 move is under 0.1 ATR → kept
-  expect(r.st.order).toMatchObject({ entry: 100.5, sl: 98.5, replaced: 1, placed_t: H }); expect(r.ev[1].tr.placed_t).toBe(H);
-  r = run(r.st, [[k(3, 102, 103, 101, 102), []]]); expect(r.ev[0].kind).toBe("cancel"); expect(r.cl[0].status).toBe("cancelled"); expect(r.st.order).toBeNull();
-  const bars: [ReturnType<typeof k>, Plan[]][] = [[k(0, 102, 103, 101, 102), [L]]]; for (let i = 1; i <= 24; i++) bars.push([k(i, 102, 103, 101, 102), i < 24 ? [L] : []]);
-  r = run(flat, bars); expect(r.ev.map((e) => e.kind)).toEqual(["place", "expire"]); expect(r.cl[0].status).toBe("expired");
+it("locked order: setup moves and setup-gone do not change the price or cancel; a new order waits until expiry", () => {
+  let r = run(flat, [[k(0, 102, 103, 101, 102), [L]], [k(1, 102, 103, 101, 102), [{ ...L, entry: 100.5, sl: 98.5, tp: 110 }]], [k(2, 102, 103, 101, 102), []]]);
+  expect(r.ev.map((e) => e.kind)).toEqual(["place"]);
+  expect(r.st.order).toMatchObject({ entry: 100, sl: 98, tp: 104, replaced: 0, placed_t: H });
+  expect(r.ev.some((e) => e.kind === "replace" || e.kind === "cancel")).toBe(false);
+  const bars: [ReturnType<typeof k>, Plan[]][] = [[k(0, 102, 103, 101, 102), [L]]];
+  for (let i = 1; i <= 24; i++) bars.push([k(i, 102, 103, 101, 102), [{ ...L, entry: 90 }]]);
+  r = run(flat, bars.slice(0, 24));
+  expect(r.st.order).toMatchObject({ entry: 100, placed_t: H });
+  expect(r.ev.filter((e) => e.kind === "place")).toHaveLength(1);
+  r = run(r.st, [bars[24]]);
+  expect(r.ev.map((e) => e.kind)).toEqual(["expire", "place"]);
+  expect(r.cl[0].status).toBe("expired");
+  expect(r.st.order).toMatchObject({ entry: 90, placed_t: 25 * H });
 });
 it("trade-through fill: a touch (or within the buffer) is not a fill; through by max(1 tick, 0.02%) is", () => {
   expect(buffer(100, M)).toBeCloseTo(0.02); expect(buffer(10, M)).toBeCloseTo(0.01);
@@ -62,8 +70,10 @@ it("stats: expectancy with a t 95% CI, profit factor, max drawdown, fill rate, w
   const f = parseTradeFilters({ tab: "filled", side: "long", status: "tp,sl" }); expect(filterTrades(T, f)).toHaveLength(4);
   expect(tradeCounts(T, f).tab).toMatchObject({ filled: 4, all: 4 }); expect(tradeCounts(T, { ...f, status: [] }).tab).toMatchObject({ filled: 5, cancelled: 1, all: 6 }); expect(tradesCsv(filterTrades(T, f)).trim().split("\n")).toHaveLength(5);
 });
-it("the frozen spec doc carries the current rules hash", () => {
-  const doc = readFileSync("docs/FORWARD_SPEC.md", "utf8"); expect(doc).toContain(`\`${rulesHash()}\``); expect(doc).toContain(STRATEGY); expect(SPEC.settings.exitMode).toBe(0); expect(SPEC.settings.minRR).toBe(3);
+it("the spec doc carries the headline hash and the frozen v1 hash", () => {
+  const doc = readFileSync("docs/FORWARD_SPEC.md", "utf8"); expect(doc).toContain(`\`${rulesHash()}\``); expect(doc).toContain(STRATEGY); expect(doc).toContain("`b81ceeeb`"); expect(doc).toContain("bn-1h-z2-v1");
+  expect(SPEC.settings.exitMode).toBe(0); expect(SPEC.settings.minRR).toBe(3); expect(rulesHash(LEGACY_SPEC)).toBe("b81ceeeb"); expect(rulesHash()).not.toBe("b81ceeeb");
+  for (const b of BOOKS) expect(BOOK_HASH[b.strategy]).toBe(b.hash);
 });
 it("job: freeze starts at the latest candle, persists trades + events idempotently, catches up after a gap", async () => {
   const db = new PGlite(); const q = async (t: string, p?: unknown[]) => (await db.query(t, p as any[])).rows as any[];
@@ -73,14 +83,31 @@ it("job: freeze starts at the latest candle, persists trades + events idempotent
   let now = 600 * H; const log = () => {};
   const tx = async (ss: Stmt[]) => { await db.transaction(async (t) => { for (const x of ss) await t.query(x.text, x.params as any[]); }); };
   const a = await paperJob(q, { now, klines: kl, funding: fu, log, tx }); expect(a.errors).toEqual([]);
-  expect((await q(`select last_t from fwd_trader`)).map((r) => Number(r.last_t))).toEqual([599 * H, 599 * H, 599 * H]);
+  const curs = await q(`select strategy, market, last_t from fwd_trader`);
+  expect(curs).toHaveLength(BOOKS.length * SPEC.markets.length);
+  // The fixture is 1H candles for every timeframe. A 4H book only treats a candle as closed once its own bar has elapsed.
+  const at = (tf: string) => curs.filter((r) => String(r.strategy).includes(`-${tf}-`)).map((r) => Number(r.last_t));
+  expect(new Set(at("1h"))).toEqual(new Set([599 * H]));
+  expect(new Set(at("15m"))).toEqual(new Set([599 * H]));
+  expect(new Set(at("4h"))).toEqual(new Set([596 * H]));
   now = 690 * H; const b = await paperJob(q, { now, klines: kl, funding: fu, log, tx }); expect(b.errors).toEqual([]);
   const tr = await q(`select * from fwd_trades`); const ev = await q(`select * from fwd_events`);
   expect(tr.length).toBeGreaterThan(0); expect(ev.length).toBeGreaterThanOrEqual(tr.length);
-  for (const m of SPEC.markets) expect(tr.filter((t) => t.market === m && ["pending", "open"].includes(t.status)).length).toBeLessThanOrEqual(1);
-  const n = (await q(`select count(*)::int n from fwd_events`))[0].n; await paperJob(q, { now, klines: kl, funding: fu, log, tx }); expect((await q(`select count(*)::int n from fwd_events`))[0].n).toBe(n);
+  for (const m of SPEC.markets) for (const b of BOOKS) expect(tr.filter((t) => t.market === m && t.strategy === b.strategy && ["pending", "open"].includes(t.status)).length).toBeLessThanOrEqual(1);
+  expect(ev.some((e) => e.kind === "replace")).toBe(false);
+  // 4H on this 1H fixture has a 90-bar gap and a 42-bar cap, so it continues next run instead of skipping to the end.
+  expect(Number((await q(`select last_t from fwd_trader where strategy = 'bn-4h-z2-v2' and market = 'BTCUSDT'`))[0].last_t)).toBe(638 * H);
+  let prev = -1, n = 0;
+  for (let i = 0; i < 6 && n !== prev; i++) { prev = n; await paperJob(q, { now, klines: kl, funding: fu, log, tx }); n = (await q(`select count(*)::int n from fwd_events`))[0].n; }
+  await paperJob(q, { now, klines: kl, funding: fu, log, tx }); expect((await q(`select count(*)::int n from fwd_events`))[0].n).toBe(n);
 });
-it("paper.js constants match the trader", async () => { const p = await import("../src/forward/paper.js"); expect(p.STRATEGY_ID).toBe(STRATEGY); expect(p.RULES_HASH).toBe(rulesHash()); expect(p.MARKETS).toEqual(SPEC.markets); });
+it("paper.js constants match the trader", async () => { const p = await import("../src/forward/paper.js"); expect(p.STRATEGY_ID).toBe(STRATEGY); expect(p.RULES_HASH).toBe(rulesHash()); expect(p.MARKETS).toEqual([...SPEC.markets]); expect(p.LEGACY_ID).toBe("bn-1h-z2-v1"); expect(p.LEGACY_HASH).toBe("b81ceeeb");
+  const boards = scoreboards([{ strategy: "bn-1h-z2-v2", status: "closed", exit_reason: "tp", r_net: 1, exit_t: 1, rules_hash: RULES() }, { strategy: "bn-15m-z1-v2", status: "closed", exit_reason: "sl", r_net: -1, exit_t: 2 }, { strategy: "bn-1h-z2-v1", status: "expired", r_net: null, exit_t: 3 }, { strategy: "bn-1h-z2-v1", status: "closed", exit_reason: "tp", r_net: 2, exit_t: 4 }]);
+  expect(boards.map((b) => b.id)[0]).toBe("bn-1h-z2-v2"); expect(boards.at(-1)!.id).toBe("bn-1h-z2-v1"); expect(boards.at(-1)!.legacy).toBe(true); expect(boards).toHaveLength(10);
+  expect(boards[0]).toMatchObject({ n: 1, avgR: 1, headline: true }); expect(boards.find((b) => b.id === "bn-15m-z1-v2")).toMatchObject({ n: 1, avgR: -1, tp: 0, sl: 1 });
+  expect(boards.at(-1)).toMatchObject({ n: 1, sample: { closed: 1, expired: 1 } });
+});
+const RULES = () => rulesHash();
 it("daily loss limit: −3R realized in a WIB day cancels the pending order, blocks new ones, keeps the open position, resumes next WIB day", () => {
   // WIB midnight = 17:00 UTC. Start the day with −2.9R already realized; one more stop crosses −3R.
   const d0 = Date.parse("2026-10-14T17:00:00Z"); const kk = (h: number, o: number, hi: number, lo: number, c: number) => ({ t: d0 + h * H, o, h: hi, l: lo, c, v: 1 });
@@ -100,7 +127,7 @@ const mkDb = () => { const db = new PGlite(); const q = async (t: string, p?: un
 const series = Array.from({ length: 700 }, (_, i) => { const b = 100 + 10 * Math.sin(i / 15) + i * 0.02; return { t: i * H, o: b, h: b + 1.2, l: b - 1.2, c: b + 0.3 * Math.sin(i), v: 100 + (i % 7) * 30 }; });
 const klAt = (now: number) => async (_m: string, n: number) => series.filter((x) => x.t + H <= now).slice(-n);
 const fu0 = async () => ({ rows: [], src: "hl-proxy" }); const quiet = () => {};
-const dump = async (q: any) => ({ tr: (await q(`select key, status, placed_t, fill_t, exit_t, bars, replaced, r_net from fwd_trades order by key`)), ev: (await q(`select market, kind, t, trade_key from fwd_events order by market, t, kind, trade_key`)), cur: (await q(`select market, last_t from fwd_trader order by market`)) });
+const dump = async (q: any) => ({ tr: (await q(`select key, status, placed_t, fill_t, exit_t, bars, replaced, r_net from fwd_trades order by key`)), ev: (await q(`select strategy, market, kind, t, trade_key from fwd_events order by strategy, market, t, kind, trade_key`)), cur: (await q(`select strategy, market, last_t from fwd_trader order by strategy, market`)) });
 it("WIB day is one half-open rule [00:00, next 00:00): trader, job restore and page agree at the 00:00 WIB candle close", async () => {
   const mid = Date.parse("2026-10-15T00:00:00+07:00");
   expect(wibDay(mid)).toBe("2026-10-15"); expect(wibDay(mid - 1)).toBe("2026-10-14"); expect(wibRange("2026-10-15")).toEqual([mid, mid + 864e5]);
@@ -113,7 +140,7 @@ it("WIB day is one half-open rule [00:00, next 00:00): trader, job restore and p
   await paperJob(q, { now: mid, klines: kl(mid), funding: fu0, log: quiet, tx }); // freeze: cursor on the candle closing at 00:00 WIB
   await q(`insert into fwd_events (strategy, market, kind, t, data) values ($1,$2,'limit',$3,'{}')`, [STRATEGY, M, mid]);
   await paperJob(q, { now: mid + 6 * H, klines: kl(mid + 6 * H), funding: fu0, log: quiet, tx });
-  const ev = await q(`select kind from fwd_events where market=$1 and t > $2`, [M, mid]); expect(ev.filter((e) => e.kind === "place")).toEqual([]);
+  const ev = await q(`select kind from fwd_events where strategy=$1 and market=$2 and t > $3`, [STRATEGY, M, mid]); expect(ev.filter((e) => e.kind === "place")).toEqual([]);
 });
 it("job: a crash midway through a coin's run leaves no half-written candle, and the rerun gives exactly the same rows as a clean run (no double count or fill)", async () => {
   const clean = mkDb(); let now = 600 * H; await paperJob(clean.q, { now, klines: klAt(now), funding: fu0, log: quiet, tx: clean.tx });

@@ -1,11 +1,11 @@
 import { expect, test } from "vitest";
 import { shadowReplay, shadowSummary, SH } from "../src/forward/shadow.js";
-import { step, settle, SPEC, rulesHash, type Trade, type State } from "../src/forward/trader";
+import { step, settle, SPEC, rulesHash, LEGACY_SPEC, type Trade, type State } from "../src/forward/trader";
 const H = 3.6e6;
 test("shadow constants mirror the frozen strategy (and the rules hash is unchanged)", () => {
   expect(SH.ttlBars).toBe(SPEC.ttlBars); expect(SH.tradeThroughPct).toBe(SPEC.fill.tradeThroughPct);
   for (const k of ["makerPct", "takerPct", "spreadPct", "stopSlipPct"] as const) expect(SH[k]).toBe(SPEC.costs[k]);
-  expect(rulesHash()).toBe("b81ceeeb");
+  expect(rulesHash(LEGACY_SPEC)).toBe("b81ceeeb"); expect(rulesHash()).not.toBe("b81ceeeb");
 });
 test("ETH #2 (placed 15:00 WIB 14 Oct, entry 2496.29, cancelled 16:00) would have filled", () => {
   const t = { id: "2", market: "ETHUSDT", side: "long", placed_t: "1791964800000", exit_t: "1791968400000", entry: 2496.29, sl: 2470.24, tp: 2576.92, risk: 26.05 };

@@ -1,5 +1,6 @@
-# Hourly forward test: snapshot Signal setups on closed candles and resolve open ones. Read-only market data, no trading.
-# GitHub may delay or skip scheduled runs; the job is idempotent and catches up missed candles (up to 72 per feed).
+# Hourly forward test: nine locked paper scorecards (15m / 1H / 4H × zones 1–3) plus the legacy snapshot resolver.
+# Read-only market data, no trading. GitHub may delay or skip a run. The job replays every closed candle since each book's cursor
+# (a normal hour is four 15m bars). A week of downtime finishes in one run; a longer gap continues next hour and is not skipped.
 name: forward-test
 on:
   schedule:

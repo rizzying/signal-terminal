@@ -34,5 +34,9 @@ export const PAPER_SCHEMA: string[] = [
   // v3.1.7: running MFE/MAE in R (research only, never used for exits/scoring); max-merged each run so best/worst never shrink
   `alter table fwd_trades add column if not exists mfe_r float8`,
   `alter table fwd_trades add column if not exists mae_r float8`,
+  // v3.2.0: tag any pre-version id as the frozen v1 book. Idempotent. Rows already on bn-1h-z2-v1 or a v2 id are not updated.
+  `update fwd_trades set strategy = 'bn-1h-z2-v1' where strategy = 'bn-1h-z2'`,
+  `update fwd_events set strategy = 'bn-1h-z2-v1' where strategy = 'bn-1h-z2'`,
+  `update fwd_trader t set strategy = 'bn-1h-z2-v1' where t.strategy = 'bn-1h-z2' and not exists (select 1 from fwd_trader e where e.strategy = 'bn-1h-z2-v1' and e.market = t.market)`,
 ];
 export async function ensurePaperSchema(q: Q) { await ensureSchema(q); for (const s of PAPER_SCHEMA) await q(s); }
