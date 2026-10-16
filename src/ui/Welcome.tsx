@@ -54,7 +54,7 @@ export function Welcome() {
         </section>
         <section className="land-block">
           <h2>HOW CONFIDENCE WORKS</h2>
-          <p className="land-display">Low, Med or High tells you how many signals agree. It is not a win chance.</p>
+          <p className="land-display">Low, Med or High is a weighted score of how strongly the signals agree. It is not a win chance.</p>
         </section>
         <section className="land-block">
           <h2>HONEST NOTE</h2>

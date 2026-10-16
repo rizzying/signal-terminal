@@ -83,7 +83,7 @@ describe("welcome route", () => {
       "Alerts:",
       "Watch the setups you care about and remove them anytime.",
       "HOW CONFIDENCE WORKS",
-      "Low, Med or High tells you how many signals agree. It is not a win chance.",
+      "Low, Med or High is a weighted score of how strongly the signals agree. It is not a win chance.",
       "HONEST NOTE",
       "Signal is a free beta. We're testing how the setups perform right now, and we'll share the results as they come in.",
       "Read-only. No trade execution. Not financial advice.",
