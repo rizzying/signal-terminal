@@ -4,7 +4,8 @@ type Colors = { accent: string; neg: string; pos: string; warn: string };
 /** Every price line for the current view. Only the selected zone, plus up to 3 liquidation clusters on the side that matters for this trade. */
 export function lineSpecs(setup: Setup | null, zone: number, analysis: Analysis | null, col: Colors, yourLiq: number | null = null): LineSpec[] {
   const out: LineSpec[] = []; const z = setup?.zones[zone]; if (!setup || !z) return out;
-  out.push({ price: z.top, color: col.accent, title: "Entry top", style: 2 }, { price: z.bottom, color: col.accent, title: "Entry bottom", style: 2 },
+  const mark = z.strength ? ` · ${z.strength}` : "";
+  out.push({ price: z.top, color: col.accent, title: `Entry top${mark}`, style: 2 }, { price: z.bottom, color: col.accent, title: "Entry bottom", style: 2 },
     { price: z.stop, color: col.neg, title: "Stop", style: 0 }, { price: z.t1, color: col.pos, title: "TP1", style: 0 }, { price: z.t2, color: col.pos, title: "TP2", style: 1 });
   // your own liquidation: drawn only when it comes before the stop (a warning)
   if (yourLiq != null) out.push({ price: yourLiq, color: col.neg, title: "Your liq", style: 1 });
@@ -27,8 +28,8 @@ export function declutter(specs: LineSpec[], toY: (p: number) => number | null, 
     if (inZone.has(specs[i]) || (y != null && kept.some((k) => Math.abs(k - y) < gap))) {
       if (x.prio === 1) { x.label = false; x.title = ""; continue; }
       // two trade levels collide (e.g. a thin entry band): keep the line, fold the name into the label already shown
-      if (x.title === "Entry bottom") { const top = out.find((o) => o.title === "Entry top"); if (top) top.title = "Entry"; x.label = false; x.title = ""; continue; }
-      if (x.title === "TP2" || x.title === "Entry top" || x.title === "Your liq") { x.label = false; x.title = ""; continue; }
+      if (x.title === "Entry bottom") { const top = out.find((o) => o.title === "Entry top" || o.title.startsWith("Entry top · ")); if (top) top.title = top.title.replace(/^Entry top/, "Entry"); x.label = false; x.title = ""; continue; }
+      if (x.title === "TP2" || x.title === "Entry top" || x.title.startsWith("Entry top · ") || x.title === "Your liq") { x.label = false; x.title = ""; continue; }
     }
     if (y != null) kept.push(y); }
   return out;

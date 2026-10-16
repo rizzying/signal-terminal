@@ -1,6 +1,7 @@
 import { atr, ema, rsi, type Candle } from "./indicators";
 import { estimateLiqMap } from "./liqmap";
 import { DEFAULTS, type Settings, type SignalKey, SIGNAL_NAMES } from "./settings";
+import { gradeZone, type ZoneFacts, type ZoneGrade, type ZoneKind } from "./zoneStrength";
 
 export type Dir = "long" | "short";
 export type Pivot = { i: number; price: number; kind: "high" | "low"; label?: "HH" | "HL" | "LH" | "LL" };
@@ -8,7 +9,7 @@ export type Break = { i: number; dir: "bull" | "bear"; level: number; choch: boo
 export type Box = { top: number; bottom: number; i: number; kind: "OB" | "FVG" | "Breaker" | "Swing" | "Liq zone"; dir: "bull" | "bear"; retests?: number; liq?: number };
 export type Signal = { key: SignalKey; name: string; pass: boolean; weight: number; detail: string };
 export type Costs = { spread: number; fees: number; slip: number; total: number };
-export type Zone = { pastTp1: boolean; pastStop: boolean; costs: Costs; rawStop: number; rank: 1 | 2 | 3; name: "Aggressive" | "Balanced" | "Deep"; top: number; bottom: number; entry: number; stop: number; t1: number; t2: number; rr1: number; rr2: number; source: string; ready: boolean; note?: string };
+export type Zone = { pastTp1: boolean; pastStop: boolean; costs: Costs; rawStop: number; rank: 1 | 2 | 3; name: "Aggressive" | "Balanced" | "Deep"; top: number; bottom: number; entry: number; stop: number; t1: number; t2: number; rr1: number; rr2: number; source: string; ready: boolean; note?: string; facts: ZoneFacts; strength: ZoneGrade };
 export type Setup = { dir: Dir; confidence: number; band: "Low" | "Medium" | "High"; othersAgree: number; othersTotal: number; structureOk: boolean; reason: string; shown: boolean; signals: Signal[]; zones: Zone[]; htf?: { tf: string; agrees: boolean | null; detail: string }; price: number; atr: number };
 export type Analysis = { pivots: Pivot[]; breaks: Break[]; obs: Box[]; fvgs: Box[]; breakers: Box[]; rsi: number[]; emaF: number[]; emaS: number[]; atr: number; liq: { price: number; long: number; short: number }[] };
 
@@ -229,7 +230,15 @@ export function buildZones(c: Candle[], an: Analysis, dir: Dir, s: Settings, ci?
     if (!((t2 - t1) * (bull ? 1 : -1) > 0)) t2 = bull ? t1 + 0.6 * Math.abs(t1 - entry) : t1 - 0.6 * Math.abs(t1 - entry); // TP2 always beyond TP1
     const src0 = z.retests === -1 ? "ATR step (no structure)" : z.kind === "Liq zone" ? `Liq zone (est. ${bull ? "long" : "short"} liquidations ~${fmt(z.liq!)})` : z.kind === "Swing" ? `Swing ${bull ? "low" : "high"}` : `${d === "bull" ? "Bullish" : "Bearish"} ${z.kind}`;
     const src = z.liq != null && z.kind !== "Liq zone" ? `${src0} + Liq zone` : src0;
-    return { pastTp1: bull ? px >= t1 : px <= t1, pastStop: bull ? px <= stop : px >= stop, costs, rawStop, rank: (k + 1) as 1 | 2 | 3, name: names[k], top: z.top, bottom: z.bottom, entry, stop, t1, t2, rr1: (Math.abs(t1 - entry) - costs.total) / R, rr2: (Math.abs(t2 - entry) - costs.total) / R, source: src, ready: px <= z.top + 1e-9 && px >= z.bottom - 1e-9, note: nudge.note };
+    // Strength reads facts the zone builder already has. It does not change prices, rank, or source.
+    const kind: ZoneKind = z.retests === -1 ? "ATR" : z.kind === "Liq zone" ? "Liq" : z.kind;
+    const facts: ZoneFacts = {
+      kind, distAtr: A > 0 ? Math.max(0, dist(z)) / A : 0, ageBars: Math.max(0, c.length - 1 - z.i),
+      retests: kind === "Breaker" ? (z.retests ?? 0) : null,
+      liqOnStructure: z.liq != null && kind !== "Liq" && kind !== "ATR", stopNudged: !!nudge.note,
+      structureAgrees: false, kindAgrees: false,
+    };
+    return { pastTp1: bull ? px >= t1 : px <= t1, pastStop: bull ? px <= stop : px >= stop, costs, rawStop, rank: (k + 1) as 1 | 2 | 3, name: names[k], top: z.top, bottom: z.bottom, entry, stop, t1, t2, rr1: (Math.abs(t1 - entry) - costs.total) / R, rr2: (Math.abs(t2 - entry) - costs.total) / R, source: src, ready: px <= z.top + 1e-9 && px >= z.bottom - 1e-9, note: nudge.note, facts, strength: gradeZone(facts).grade };
   });
 }
 export function htfAgree(htf: Candle[] | null, dir: Dir, s: Settings, tf: string): Setup["htf"] {
@@ -249,9 +258,19 @@ export function scan(c: Candle[], dir: Dir, s: Settings, opts: { maxLev?: number
   if (s.gateStructure && !structureOk) fails.push("structure (BoS/ChoCH) doesn't agree");
   if (othersAgree < minO) fails.push(`only ${othersAgree} of ${others.length} other signals agree (need ${minO})`);
   if (conf < s.threshold) fails.push(`confidence ${conf}% is under your ${s.threshold}% filter`);
-  return { dir, confidence: conf, band: confidenceBand(conf), othersAgree, othersTotal: others.length, structureOk, reason: fails.join("; "), shown: !fails.length, signals, zones: buildZones(c, an, dir, s, opts.costs), htf: s.useHtf && opts.htfTf ? htfAgree(opts.htf ?? null, dir, s, opts.htfTf) : undefined, price: c.at(-1)!.c, atr: an.atr };
+  return { dir, confidence: conf, band: confidenceBand(conf), othersAgree, othersTotal: others.length, structureOk, reason: fails.join("; "), shown: !fails.length, signals, zones: gradeZones(buildZones(c, an, dir, s, opts.costs), signals), htf: s.useHtf && opts.htfTf ? htfAgree(opts.htf ?? null, dir, s, opts.htfTf) : undefined, price: c.at(-1)!.c, atr: an.atr };
 }
 export const confidenceBand = (c: number): "Low" | "Medium" | "High" => (c > 70 ? "High" : c >= 50 ? "Medium" : "Low");
+/** Re-grade zones once the setup's signals exist. Prices and rank stay as buildZones left them. */
+export function gradeZones(zones: Zone[], signals: Signal[]): Zone[] {
+  const on = (key: SignalKey) => { const x = signals.find((s) => s.key === key); return !!x && x.weight > 0 && x.pass; };
+  const structureAgrees = on("structure");
+  return zones.map((z) => {
+    const kindAgrees = z.facts.kind === "OB" || z.facts.kind === "FVG" ? on("fvgob") : z.facts.kind === "Breaker" ? on("breaker") : z.facts.kind === "Swing" ? on("swings") : false;
+    const facts: ZoneFacts = { ...z.facts, structureAgrees, kindAgrees };
+    return { ...z, facts, strength: gradeZone(facts).grade };
+  });
+}
 export const MIN_CANDLES = 30;
 export const HTF: Record<string, string | undefined> = { "1m": "15m", "5m": "1h", "15m": "4h", "1h": "4h", "4h": "1d", "12h": "3d", "1d": "1w", "3d": "1w", "1w": undefined };
 /** Snap a setup's prices to the exchange tick. Stops round away from entry so rounding never shrinks risk. */

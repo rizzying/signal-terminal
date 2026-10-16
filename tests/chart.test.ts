@@ -19,7 +19,7 @@ describe("chart price lines (regression: stale est. liq lines)", () => {
   });
   it("only the selected zone and the trade-side liq clusters are drawn", () => {
     const S = scan(c, "short", DEFAULTS); const sp = lineSpecs(S, 1, an, col);
-    expect(sp.filter((x) => x.title === "Entry top")).toEqual([expect.objectContaining({ price: S.zones[1].top })]);
+    expect(sp.filter((x) => x.title.startsWith("Entry top"))).toEqual([expect.objectContaining({ price: S.zones[1].top })]);
     sp.filter((x) => x.title.endsWith("liq zone")).forEach((x) => expect(x.price).toBeGreaterThan(S.price));
   });
   it("flags zones where price is already past TP1 / stop", () => {
@@ -30,5 +30,6 @@ describe("chart price lines (regression: stale est. liq lines)", () => {
 });
 it("v2: no median line on the chart, only entry top/bottom, stop, TP1, TP2 (+ liq)", () => {
   const c = mk(300); const S = scan(c, "short", DEFAULTS); const t = lineSpecs(S, 1, null, col).map((x) => x.title);
-  expect(t).toEqual(["Entry top", "Entry bottom", "Stop", "TP1", "TP2"]);
+  expect(t[0]).toMatch(/^Entry top · (Strong|OK|Weak)$/);
+  expect(t.slice(1)).toEqual(["Entry bottom", "Stop", "TP1", "TP2"]);
 });

@@ -1,4 +1,4 @@
-# Forward test spec (v3.2.0)
+# Forward test spec (v3.3.0)
 
 Nine paper scorecards on Binance spot. The headline is **1H Zone 2**. It is listed first everywhere (the page, `/api/paper`, `/api/forward`). The other eight are the same coins and the same rules on the other zones and timeframes. Nothing is blended.
 
