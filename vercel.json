@@ -3,6 +3,10 @@
  "framework": "vite",
  "buildCommand": "npm run build",
  "outputDirectory": "dist",
+ "rewrites": [
+  { "source": "/welcome", "destination": "/welcome.html" },
+  { "source": "/welcome/", "destination": "/welcome.html" }
+ ],
  "headers": [
   {
    "source": "/(.*)",

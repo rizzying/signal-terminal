@@ -52,3 +52,36 @@ Corners are one system: 6px on controls, 12px on cards. The bottom nav on a phon
 ## What did not change
 
 Feature behavior, copy of the confidence line ("signals agreeing, not win chance"), chart line names (Entry top, Stop, TP1, TP2), forward-test scorecards, and the device-only alert store. Zone strength is an extra word on the zone, the chart's entry label, and the copied setup. It is not a new score in the engine's confidence.
+
+## Landing page
+
+The terminal note above still describes `/`. `/welcome` is a separate document, so the full-width scan layout, the hash tabs, and the PWA `start_url` stay as they are. Patterns only: no Tempo assets, logos, or sentences. The one picture is a screenshot of Signal's own chart, taken from the scan view with a setup's zone lines on it.
+
+Measured on the live page at [tempo.xyz](https://tempo.xyz/) (desktop 1440 and phone 390, scrolled through the page) before this layout. Two other sources stayed as checks, not as the page shape.
+
+1. **Tempo.** Ground `#f5f5f5`. A centered pill, about 862×52, sitting 24px from the top, fill `#e9e9e9`, full radius. Wordmark on the left, a black pill (44px, radius 22px, label `#f5f5f5`) on the right. On a phone the same pill goes nearly edge to edge and the extra links disappear. Headline at 53px / 500 / tracking about −0.04em / line-height 0.95, max width 600px, starting 247px down the viewport (144px and 36px type on a phone). Subhead 16px / 500 / `#434343`, 32px under the headline. Two pills side by side, 48px tall, 8px apart: solid black, and a soft gray `rgba(194,194,194,.24)`. A quiet name strip 64px under that, then a full-width picture inset 60px, radius 32px. Later sections use a small tracked label and a 36px / 500 heading, with 100–160px of air above each block.
+
+2. **Cal.com**, open at [cal.com](https://cal.com/). A promise, then a short explanation, then a list of what the product does, then the same action again at the end. Logo walls, testimonials, pricing, and their sentences stay there. Used here: each capability is a short lead-in plus one sentence, and the action repeats in the footer.
+
+3. **[Refactoring UI](https://www.refactoringui.com/).** Labels are smaller and lighter than the text they introduce. The reading measure stays capped. Hierarchy comes from size and weight.
+
+### Layout
+
+- Desktop (1440): fixed pill nav, centered. Headline centered under a large top margin. Subhead one line. Two pills. Then Binance, Hyperliquid, Bulk as plain gray words (no marks). Then the chart card, 32px radius, inset 60px. Sections sit in a 720px column, 120px apart. The closing line and the last pill are centered.
+- Phone (390): the pill is `calc(100% - 24px)`, still one row (wordmark, theme, Open Signal). Headline 36px. The two hero pills stay side by side. The chart card inset is 12px, radius 20px. Sections 72px apart.
+- Light and dark follow `sig.theme`. Dark inverts the same neutrals: ground `#111`, nav `#2a2a2a`, the solid pill turns white with `#111` type. The chart picture swaps to the dark screenshot.
+
+### Type
+
+Geist Variable, already in the app. Headline 53px desktop / 36px phone, weight 500, tracking −0.04em, line-height 0.95. Subhead and body 16px / 500. Section labels 13px, tracked, faint. The sentence under WHAT IT IS, HOW CONFIDENCE WORKS, and HONEST NOTE is 36px desktop / 28px phone, the same role as Tempo's section heading. Feature lead-ins are 22px; the sentence under each is 16px muted.
+
+### Color
+
+This page does not use the terminal's warm bone or clay. The ground is the neutral `#f5f5f5` measured on Tempo, and the nav pill is `#e9e9e9`. Ink is black. The solid pill is black in light mode and white in dark mode. No gradient, no glass, no second accent.
+
+### Spacing
+
+- Nav 24px from the top (16px on a phone). Headline starts at 247px (144px on a phone).
+- 32px from headline to subhead, 32px from subhead to the pills, 8px between pills.
+- 64px from the pills to the name strip, 28px from the strip to the chart card.
+- 120px before each section on a wide screen, 72px under 48rem. 48px between feature rows (32px on a phone).
