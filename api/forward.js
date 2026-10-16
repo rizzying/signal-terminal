@@ -3,7 +3,18 @@ import { neon } from "@neondatabase/serverless";
 import { toCsv, csvFilename, CSV_CAP } from "../src/forward/csv.js";
 import { VERSION_SQL, parseVersion } from "../src/forward/version.js";
 import { hideRepeats, parseFilters, filterRows, score, breakdown, setups, facets, DIMS, fillCounts, zoneRows, filterCounts } from "../src/forward/view.js";
+import { scoreboards, reportBooks } from "../src/forward/paper.js";
 export const config = { maxDuration: 20 };
+/** Paper scorecards (headline first). Missing table or a read error leaves the snapshot log alone. */
+async function paperBoards(sql) {
+  try {
+    const has = (await sql.query(`select 1 from information_schema.tables where table_name = 'fwd_trades'`)).length > 0;
+    if (!has) return [];
+    const ids = reportBooks().map((b) => b.id);
+    const T = await sql.query(`select strategy, rules_hash, status, exit_reason, exit_t, fill_t, r_net from fwd_trades where strategy in (${ids.map((_, i) => `$${i + 1}`).join(",")})`, ids);
+    return scoreboards(T);
+  } catch { return []; }
+}
 export default async function handler(req, res) {
   const url = process.env.DATABASE_URL;
   if (!url) { res.setHeader("Cache-Control", "s-maxage=60"); return res.status(200).json({ configured: false }); }
@@ -24,8 +35,9 @@ export default async function handler(req, res) {
       return res.status(200).send(toCsv([...rows].sort((a, b) => Number(a.close_t) - Number(b.close_t))));
     }
     res.setHeader("Cache-Control", "public, s-maxage=120, stale-while-revalidate=600");
+    const scorecards = await paperBoards(sql);
     return res.status(200).json({ configured: true, lastRun: runs[0] ?? null, version: ver, versions, filters: f, hidden, total: rows.length,
-      score: score(rows), by: Object.fromEntries(Object.keys(DIMS).map((d) => [d, breakdown(rows, d)])), setups: setups(rows, 40), facets: facets(shown), tabs: tabCounts, counts: filterCounts(shown, f), zones: zoneRows(rows, q.order === "asc" ? "asc" : "desc", 300), at: Date.now() });
+      score: score(rows), scorecards, by: Object.fromEntries(Object.keys(DIMS).map((d) => [d, breakdown(rows, d)])), setups: setups(rows, 40), facets: facets(shown), tabs: tabCounts, counts: filterCounts(shown, f), zones: zoneRows(rows, q.order === "asc" ? "asc" : "desc", 300), at: Date.now() });
   } catch (e) {
     res.setHeader("Cache-Control", "s-maxage=30");
     const msg = String(e?.message ?? e).replace(/postgres(ql)?:\/\/[^\s]+/g, "postgres://***");

@@ -1,4 +1,5 @@
-// v3.0 forward-test scorecard (plain JS: used by api/forward.js and the UI). Live stats only; rules in docs/FORWARD_SPEC.md.
+// v3.2 forward-test scorecards (plain JS: used by api/paper.js, api/forward.js and the UI).
+import { MARKETS as BOOK_MARKETS, reportBooks, bookOf, HEADLINE_ID, BOOK_HASH, LEGACY_ID, LEGACY_HASH } from "./books.js";
 export const FIRST_READ = 30, DECISION = 100, DAILY_LIMIT_R = -3;
 // two-sided 95% Student-t critical values; n-1 degrees of freedom
 const T95 = { 1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228, 12: 2.179, 15: 2.131, 20: 2.086, 25: 2.06, 30: 2.042, 40: 2.021, 60: 2.0, 120: 1.98 };
@@ -40,14 +41,33 @@ const list = (v) => (v == null || v === "" ? [] : String(v).split(",").map((x) =
 export const tradeId = (t) => (t?.id == null ? "" : `F-${t.id}`);
 /** Parse a search like "12", "F-12", "f12", "#12" into the numeric id string, or "" if not an id. */
 export const parseTradeId = (v) => { const m = /^\s*#?\s*(?:f\s*-?\s*)?(\d+)\s*$/i.exec(String(v ?? "")); return m ? String(Number(m[1])) : ""; };
-export function parseTradeFilters(q = {}) { return { tab: TABS.some((t) => t.key === q.tab) ? q.tab : "all", market: list(q.market), side: list(q.side), status: list(q.status), id: parseTradeId(q.id) }; }
+const ZONES = ["1", "2", "3"], TFS = ["15m", "1h", "4h"];
+export function parseTradeFilters(q = {}) { return { tab: TABS.some((t) => t.key === q.tab) ? q.tab : "all", market: list(q.market), side: list(q.side), status: list(q.status), id: parseTradeId(q.id), zone: ZONES.includes(String(q.zone ?? "")) ? String(q.zone) : "", tf: TFS.includes(String(q.tf ?? "")) ? String(q.tf) : "" }; }
 export function filterTrades(T, f, skip) {
   return T.filter((t) => (skip === "tab" || f.tab === "all" || tabOf(t) === f.tab) && (skip === "market" || !f.market.length || f.market.includes(t.market))
-    && (skip === "side" || !f.side.length || f.side.includes(t.side)) && (skip === "status" || !f.status.length || f.status.includes(tstatus(t))) && (!f.id || String(t.id) === f.id));
+    && (skip === "side" || !f.side.length || f.side.includes(t.side)) && (skip === "status" || !f.status.length || f.status.includes(tstatus(t))) && (!f.id || String(t.id) === f.id)
+    && (skip === "zone" || !f.zone || String(bookOf(t.strategy)?.zone ?? "") === f.zone) && (skip === "tf" || !f.tf || bookOf(t.strategy)?.tf === f.tf));
 }
 export function tradeCounts(T, f) {
   const cnt = (dim, val) => { const o = {}; for (const t of filterTrades(T, f, dim)) { const k = val(t); o[k] = (o[k] ?? 0) + 1; } return o; };
-  return { tab: { ...cnt("tab", tabOf), all: filterTrades(T, f, "tab").length }, market: cnt("market", (t) => t.market), side: cnt("side", (t) => t.side), status: cnt("status", tstatus) };
+  return { tab: { ...cnt("tab", tabOf), all: filterTrades(T, f, "tab").length }, market: cnt("market", (t) => t.market), side: cnt("side", (t) => t.side), status: cnt("status", tstatus),
+    zone: cnt("zone", (t) => String(bookOf(t.strategy)?.zone ?? "")), tf: cnt("tf", (t) => bookOf(t.strategy)?.tf ?? "") };
+}
+/** Closed-trade rates for one scorecard. Sample sizes sit next to every rate so a small book is obvious. */
+export function scoreboard(trades) {
+  const s = scorecard(trades);
+  const tp = trades.filter((t) => t.status === "closed" && t.exit_reason === "tp").length;
+  const sl = trades.filter((t) => t.status === "closed" && t.exit_reason !== "tp").length;
+  return { n: s.n, pending: s.pending, open: s.open, cancelled: s.cancelled, expired: s.expired, filled: s.filled, fillRate: s.fillRate,
+    tp, sl, tpRate: s.n ? tp / s.n : null, slRate: s.n ? sl / s.n : null, avgR: s.expR,
+    sample: { closed: s.n, filled: s.filled, cancelled: s.cancelled, expired: s.expired, tp, sl, open: s.open, pending: s.pending }, score: s };
+}
+/** One entry per report book, headline first, legacy last. Trades never cross books. */
+export function scoreboards(trades, metas = reportBooks()) {
+  return metas.map((m) => {
+    const rows = trades.filter((t) => t.strategy === m.id);
+    return { id: m.id, name: m.name, tf: m.tf, zone: m.zone, headline: !!m.headline, legacy: !!m.legacy, rulesHash: rows.find((t) => t.rules_hash)?.rules_hash ?? m.rulesHash ?? null, ...scoreboard(rows) };
+  });
 }
 const H = ["id", "strategy", "rules_hash", "market", "side", "status", "placed_wib", "entry", "sl", "tp", "risk", "replaced", "fill_wib", "exit_wib", "exit_px", "exit_reason", "bars", "r_gross", "cost_r", "funding_r", "funding_src", "r_net", "mfe_r", "mae_r", "risk_usd", "usd_net", "mfe_usd", "mae_usd"];
 const wib = (t) => (t == null ? "" : new Date(Number(t) + 7 * 3.6e6).toISOString().slice(0, 16).replace("T", " "));
@@ -58,11 +78,16 @@ export function tradesCsv(T, risk = 100) {
   return [H.join(","), ...T.map((t) => [tradeId(t), t.strategy, t.rules_hash, t.market, t.side, tstatus(t), wib(t.placed_t), t.entry, t.sl, t.tp, t.risk, t.replaced, wib(t.fill_t), wib(t.exit_t), t.exit_px, t.exit_reason,
     t.bars, ...["r_gross", "cost_r", "funding_r"].map((k) => (t[k] == null ? "" : Number(t[k]).toFixed(4))), t.funding_src, t.r_net == null ? "" : Number(t.r_net).toFixed(4), t.mfe == null ? "" : Number(t.mfe).toFixed(4), t.mae == null ? "" : Number(t.mae).toFixed(4), risk, usdc(t.r_net, risk), usdc(t.mfe, risk), usdc(t.mae, risk)].map(cell).join(","))].join("\n") + "\n";
 }
-/** Mirrors STRATEGY / rulesHash() in trader.ts (a test keeps them in sync). */
-export const STRATEGY_ID = "bn-1h-z2-v1", STRATEGY_NAME = "Binance 1H Zone 2", RULES_HASH = "b81ceeeb", MARKETS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
-/** Today's realized R and daily-limit status per market (WIB day). */
+/** Headline book. Mirrors STRATEGY / rulesHash() in trader.ts (a test keeps them in sync). */
+export const STRATEGY_ID = HEADLINE_ID, STRATEGY_NAME = "Binance 1H Zone 2", RULES_HASH = BOOK_HASH[HEADLINE_ID], MARKETS = BOOK_MARKETS;
+export { LEGACY_ID, LEGACY_HASH, reportBooks, bookOf };
+/** Today's realized R and daily-limit status per market (WIB day), for one scorecard's rows. */
 export function today(T, limits, now = Date.now()) {
   const key = new Date(now + 7 * 3.6e6).toISOString().slice(0, 10); const d0 = Date.parse(key + "T00:00:00+07:00"); const inDay = (t) => t != null && Number(t) >= d0 && Number(t) < d0 + 864e5 // half-open [00:00, next 00:00) WIB, same as the trader;
   return Object.fromEntries(MARKETS.map((m) => { const r = T.filter((t) => t.market === m && t.status === "closed" && inDay(t.exit_t)).reduce((a, t) => a + Number(t.r_net), 0);
     return [m, { r, hit: limits.some((e) => e.market === m && inDay(e.t)), limit: DAILY_LIMIT_R }]; }));
+}
+/** Per scorecard, then per market. The −3R pause is not shared across zones or timeframes. */
+export function todayByBook(T, limits, now = Date.now(), metas = reportBooks()) {
+  return Object.fromEntries(metas.map((m) => [m.id, today(T.filter((t) => t.strategy === m.id), limits.filter((e) => e.strategy === m.id), now)]));
 }

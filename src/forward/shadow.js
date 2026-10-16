@@ -6,16 +6,16 @@ export const SH = { ttlBars: 24, tradeThroughPct: 0.02, tick: 0.01, makerPct: 0.
 const H = 3.6e6;
 const rt = (v, dir) => { const n = v / SH.tick; return +((dir === "down" ? Math.floor(n + 1e-9) : dir === "up" ? Math.ceil(n - 1e-9) : Math.round(n)) * SH.tick).toFixed(8); };
 const buf = (px) => Math.max(SH.tick, (px * SH.tradeThroughPct) / 100);
-/** t: cancelled trade row; K: closed 1H candles {t,o,h,l,c} (any range; only those after the cancel are used). */
-export function shadowReplay(t, K) {
+/** t: cancelled trade row; K: closed candles of the trade's timeframe {t,o,h,l,c}. barMs defaults to 1H. */
+export function shadowReplay(t, K, barMs = H) {
   const L = t.side === "long", entry = +t.entry, sl = +t.sl, tp = +t.tp, risk = +t.risk || Math.abs(entry - sl), cancel = Number(t.exit_t), placed = Number(t.placed_t);
-  let bars = Math.round((cancel - placed) / H), fill = null;
+  let bars = Math.round((cancel - placed) / barMs), fill = null;
   const settle = (px, why, exitT) => { const gross = ((L ? 1 : -1) * (px - entry)) / risk; const cost = (entry * SH.makerPct / 100 + px * (why === "tp" ? SH.makerPct : SH.takerPct + SH.spreadPct) / 100) / risk;
     return { status: why, fill_t: fill, exit_t: exitT, exit_px: px, r: gross - cost }; };
   const stopPx = (k) => rt((L ? Math.min(k.o, sl) : Math.max(k.o, sl)) * (1 - (L ? 1 : -1) * SH.stopSlipPct / 100));
   const stopHit = (k) => (L ? k.l <= sl : k.h >= sl);
   for (const k of [...K].filter((k) => k.t >= cancel).sort((a, b) => a.t - b.t)) {
-    const close = k.t + H;
+    const close = k.t + barMs;
     if (fill == null) { bars++;
       if (L ? k.l <= entry - buf(entry) : k.h >= entry + buf(entry)) { fill = close; if (stopHit(k)) return settle(stopPx(k), "sl", close); continue; }
       if (bars >= SH.ttlBars) return { status: "expired", fill_t: null, exit_t: close, exit_px: null, r: null };
