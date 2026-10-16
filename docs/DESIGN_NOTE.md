@@ -52,3 +52,43 @@ Corners are one system: 6px on controls, 12px on cards. The bottom nav on a phon
 ## What did not change
 
 Feature behavior, copy of the confidence line ("signals agreeing, not win chance"), chart line names (Entry top, Stop, TP1, TP2), forward-test scorecards, and the device-only alert store. Zone strength is an extra word on the zone, the chart's entry label, and the copied setup. It is not a new score in the engine's confidence.
+
+## Landing page
+
+Written before the `/welcome` page (v3.4.0). The terminal note above still describes `/`. This page is a separate document, so the full-width scan layout, the hash tabs, and the PWA `start_url` stay as they are. Nothing was copied: no logos, no images, no sentences.
+
+Three concrete sources, looked at before the layout.
+
+1. **Tempo**, the page linked from [minimal.gallery](https://minimal.gallery/) at [tempo.xyz](https://tempo.xyz/?ref=minimal.gallery). One short name, one large line, one supporting sentence, one action, then stacked sections down a single column with a second action at the end. The field is quiet and the type does the work. The video, the stat row, and their product lines stay there. Used here: the hero is a name, a line, a sentence, and one button. Sections follow in one column. There is no card grid and no illustration.
+
+2. **Cal.com**, the landing recorded on [SaaSFrame](https://www.saasframe.io/examples/cal-com-landing-page) and open at [cal.com](https://cal.com/). A promise, then a short explanation, then a list of what the product does, then the same action again in the footer. Logo walls, testimonials, pricing, and their sentences stay there. Used here: each capability is a short lead-in plus one sentence, and the only repeat of the button is at the bottom.
+
+3. **[Refactoring UI](https://www.refactoringui.com/).** Same spacing scale as the terminal (4, 8, 16, 24, 32, 64). Labels are smaller and lighter than the text they introduce. The reading measure is capped so a line does not run the full 1440 viewport. Hierarchy comes from size and weight, not from boxes, shadows, or a second accent.
+
+### Layout
+
+- The terminal stays full-bleed. The landing is a centered column, 42rem, with a 24px gutter (16px at 390). That is the difference: this page is for reading, the app is for scanning.
+- Desktop (1440): name and theme toggle on one row, headline under them, sections 64px apart. The button is inline, not a full-width bar.
+- Phone (390): the same column, sections 40px apart, headline at 32px, buttons at least 44px tall. Nothing sits in a second column.
+- No hero image, no logo row, no pricing, no animation library.
+
+### Type
+
+- Geist Variable, already in the app. The headline is 48px at 1440 and 32px at 390, weight 560, tracking -0.03em, line-height 1.05. Body on this page is 17px / 1.6 so a paragraph is easier to read than a table.
+- Section names stay the small mono label (11px, tracked), the same role as a field label in the terminal. The sentence under each label is the content.
+- Feature lead-ins are 15px, weight 560, in ink. The sentence after them is secondary ink.
+
+### Color
+
+The v3.3 tokens, unchanged. Ground, surface, ink, and the clay accent are the table in the terminal note. The accent is only the brand dot. The button is ink on the ground (the existing primary), in both themes. Light and dark follow `sig.theme`, the same key as the app, so the choice carries from one to the other. No new hue, no gradient, no glass.
+
+### Spacing
+
+- 28px under the top row before the headline, 20px before the supporting sentence, 24px before the button.
+- 64px between sections on a wide screen, 40px under 48rem.
+- 24px between feature rows, 4px between a lead-in and its sentence.
+- 16px between the closing line and the second button.
+
+### Why
+
+A marketing page on `/` would replace the terminal people already open, including installed copies whose start URL is `/`. A separate `/welcome` can be quiet and still send both actions to `/`. The references above are wide, airy pages with one job per screen. Signal keeps that job (say what it is, then open the tool) and keeps the terminal's type, color, and corners so the two pages feel like one product.

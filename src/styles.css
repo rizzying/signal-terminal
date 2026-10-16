@@ -79,7 +79,7 @@ table.mini td{padding:4px 6px}
 .formgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.formgrid label{display:grid;gap:4px;font-size:12px;color:var(--ink-2)}
 .formgrid .full{grid-column:1/-1}.formgrid .check{display:flex;align-items:center;gap:8px;align-self:end}.shot{max-width:100%;border-radius:var(--r-control)}
 pre{white-space:pre-wrap;overflow-wrap:anywhere}
-.foot{margin-top:48px;text-align:center}
+.foot{margin-top:48px;text-align:center}.foot a{color:inherit}
 @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.rise{animation:rise 220ms var(--ease) both}
 @media (max-width:63.99rem){.zones{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr 1fr}}
 @media (max-width:47.99rem){
@@ -216,4 +216,26 @@ main{min-height:100vh}
 .setups .tkv{margin:0}
 @media (max-width:47.99rem){.alerts li{grid-template-columns:1fr auto}.alerts li>:nth-child(2),.alerts li>:nth-child(4){grid-column:1}.alerts li .btn{grid-column:2;grid-row:1}}
 .rsub{font-size:.78em;font-weight:400;margin-left:.15em}
+.land{max-width:42rem;margin:0 auto;padding:48px 24px 80px}
+.land-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 48px}
+.land-top .brand{margin:0}
+.land h1{font-size:48px;font-weight:560;letter-spacing:-.03em;line-height:1.05;margin:0}
+.land-lead{font-size:17px;line-height:1.6;color:var(--ink-2);margin:20px 0 0;max-width:38rem}
+.land-cta{margin:24px 0 0}
+.land a.btn{text-decoration:none}
+.land-sec{margin-top:64px}
+.land-sec h2{font-family:var(--mono);font-size:11px;font-weight:400;letter-spacing:.06em;color:var(--ink-3);margin:0 0 16px}
+.land-sec p{margin:0;font-size:17px;line-height:1.6}
+.land-list{list-style:none;padding:0;margin:0;display:grid;gap:24px}
+.land-list li{display:grid;gap:4px;font-size:15px;line-height:1.55}
+.land-list b{font-weight:560}
+.land-list span{color:var(--ink-2)}
+.land-foot{margin-top:64px;display:grid;gap:16px;justify-items:start}
+.land-foot p{margin:0;color:var(--ink-3);font-size:13px}
+@media (max-width:47.99rem){
+  .land{padding:28px 16px 48px}
+  .land-top{margin-bottom:32px}
+  .land h1{font-size:32px}
+  .land-sec,.land-foot{margin-top:40px}
+}
 .ztable td .whatif,.ztable td[data-label="Result"]{white-space:normal;min-width:12em}.ztable td .whatif{display:inline-block;max-width:24em}
