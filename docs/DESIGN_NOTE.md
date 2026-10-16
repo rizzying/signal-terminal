@@ -55,40 +55,33 @@ Feature behavior, copy of the confidence line ("signals agreeing, not win chance
 
 ## Landing page
 
-Written before the `/welcome` page (v3.4.0). The terminal note above still describes `/`. This page is a separate document, so the full-width scan layout, the hash tabs, and the PWA `start_url` stay as they are. Nothing was copied: no logos, no images, no sentences.
+The terminal note above still describes `/`. `/welcome` is a separate document, so the full-width scan layout, the hash tabs, and the PWA `start_url` stay as they are. Patterns only: no Tempo assets, logos, or sentences. The one picture is a screenshot of Signal's own chart, taken from the scan view with a setup's zone lines on it.
 
-Three concrete sources, looked at before the layout.
+Measured on the live page at [tempo.xyz](https://tempo.xyz/) (desktop 1440 and phone 390, scrolled through the page) before this layout. Two other sources stayed as checks, not as the page shape.
 
-1. **Tempo**, the page linked from [minimal.gallery](https://minimal.gallery/) at [tempo.xyz](https://tempo.xyz/?ref=minimal.gallery). One short name, one large line, one supporting sentence, one action, then stacked sections down a single column with a second action at the end. The field is quiet and the type does the work. The video, the stat row, and their product lines stay there. Used here: the hero is a name, a line, a sentence, and one button. Sections follow in one column. There is no card grid and no illustration.
+1. **Tempo.** Ground `#f5f5f5`. A centered pill, about 862×52, sitting 24px from the top, fill `#e9e9e9`, full radius. Wordmark on the left, a black pill (44px, radius 22px, label `#f5f5f5`) on the right. On a phone the same pill goes nearly edge to edge and the extra links disappear. Headline at 53px / 500 / tracking about −0.04em / line-height 0.95, max width 600px, starting 247px down the viewport (144px and 36px type on a phone). Subhead 16px / 500 / `#434343`, 32px under the headline. Two pills side by side, 48px tall, 8px apart: solid black, and a soft gray `rgba(194,194,194,.24)`. A quiet name strip 64px under that, then a full-width picture inset 60px, radius 32px. Later sections use a small tracked label and a 36px / 500 heading, with 100–160px of air above each block.
 
-2. **Cal.com**, the landing recorded on [SaaSFrame](https://www.saasframe.io/examples/cal-com-landing-page) and open at [cal.com](https://cal.com/). A promise, then a short explanation, then a list of what the product does, then the same action again in the footer. Logo walls, testimonials, pricing, and their sentences stay there. Used here: each capability is a short lead-in plus one sentence, and the only repeat of the button is at the bottom.
+2. **Cal.com**, open at [cal.com](https://cal.com/). A promise, then a short explanation, then a list of what the product does, then the same action again at the end. Logo walls, testimonials, pricing, and their sentences stay there. Used here: each capability is a short lead-in plus one sentence, and the action repeats in the footer.
 
-3. **[Refactoring UI](https://www.refactoringui.com/).** Same spacing scale as the terminal (4, 8, 16, 24, 32, 64). Labels are smaller and lighter than the text they introduce. The reading measure is capped so a line does not run the full 1440 viewport. Hierarchy comes from size and weight, not from boxes, shadows, or a second accent.
+3. **[Refactoring UI](https://www.refactoringui.com/).** Labels are smaller and lighter than the text they introduce. The reading measure stays capped. Hierarchy comes from size and weight.
 
 ### Layout
 
-- The terminal stays full-bleed. The landing is a centered column, 42rem, with a 24px gutter (16px at 390). That is the difference: this page is for reading, the app is for scanning.
-- Desktop (1440): name and theme toggle on one row, headline under them, sections 64px apart. The button is inline, not a full-width bar.
-- Phone (390): the same column, sections 40px apart, headline at 32px, buttons at least 44px tall. Nothing sits in a second column.
-- No hero image, no logo row, no pricing, no animation library.
+- Desktop (1440): fixed pill nav, centered. Headline centered under a large top margin. Subhead one line. Two pills. Then Binance, Hyperliquid, Bulk as plain gray words (no marks). Then the chart card, 32px radius, inset 60px. Sections sit in a 720px column, 120px apart. The closing line and the last pill are centered.
+- Phone (390): the pill is `calc(100% - 24px)`, still one row (wordmark, theme, Open Signal). Headline 36px. The two hero pills stay side by side. The chart card inset is 12px, radius 20px. Sections 72px apart.
+- Light and dark follow `sig.theme`. Dark inverts the same neutrals: ground `#111`, nav `#2a2a2a`, the solid pill turns white with `#111` type. The chart picture swaps to the dark screenshot.
 
 ### Type
 
-- Geist Variable, already in the app. The headline is 48px at 1440 and 32px at 390, weight 560, tracking -0.03em, line-height 1.05. Body on this page is 17px / 1.6 so a paragraph is easier to read than a table.
-- Section names stay the small mono label (11px, tracked), the same role as a field label in the terminal. The sentence under each label is the content.
-- Feature lead-ins are 15px, weight 560, in ink. The sentence after them is secondary ink.
+Geist Variable, already in the app. Headline 53px desktop / 36px phone, weight 500, tracking −0.04em, line-height 0.95. Subhead and body 16px / 500. Section labels 13px, tracked, faint. The sentence under WHAT IT IS, HOW CONFIDENCE WORKS, and HONEST NOTE is 36px desktop / 28px phone, the same role as Tempo's section heading. Feature lead-ins are 22px; the sentence under each is 16px muted.
 
 ### Color
 
-The v3.3 tokens, unchanged. Ground, surface, ink, and the clay accent are the table in the terminal note. The accent is only the brand dot. The button is ink on the ground (the existing primary), in both themes. Light and dark follow `sig.theme`, the same key as the app, so the choice carries from one to the other. No new hue, no gradient, no glass.
+This page does not use the terminal's warm bone or clay. The ground is the neutral `#f5f5f5` measured on Tempo, and the nav pill is `#e9e9e9`. Ink is black. The solid pill is black in light mode and white in dark mode. No gradient, no glass, no second accent.
 
 ### Spacing
 
-- 28px under the top row before the headline, 20px before the supporting sentence, 24px before the button.
-- 64px between sections on a wide screen, 40px under 48rem.
-- 24px between feature rows, 4px between a lead-in and its sentence.
-- 16px between the closing line and the second button.
-
-### Why
-
-A marketing page on `/` would replace the terminal people already open, including installed copies whose start URL is `/`. A separate `/welcome` can be quiet and still send both actions to `/`. The references above are wide, airy pages with one job per screen. Signal keeps that job (say what it is, then open the tool) and keeps the terminal's type, color, and corners so the two pages feel like one product.
+- Nav 24px from the top (16px on a phone). Headline starts at 247px (144px on a phone).
+- 32px from headline to subhead, 32px from subhead to the pills, 8px between pills.
+- 64px from the pills to the name strip, 28px from the strip to the chart card.
+- 120px before each section on a wide screen, 72px under 48rem. 48px between feature rows (32px on a phone).

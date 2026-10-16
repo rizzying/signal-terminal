@@ -89,7 +89,13 @@ describe("welcome route", () => {
       "Read-only. No trade execution. Not financial advice.",
     ]) expect(text).toContain(line);
     const opens = [...el.querySelectorAll('a[href="/"]')].map((a) => a.textContent);
-    expect(opens).toEqual(["Open Signal", "Open Signal"]);
+    expect(opens).toEqual(["Open Signal", "Open Signal", "Open Signal"]);
+    expect(el.querySelector('a[href="#what-it-does"]')?.textContent).toBe("How it works");
+    expect(el.querySelector(".land-venues")?.textContent).toContain("Binance");
+    expect(el.querySelector(".land-venues")?.textContent).toContain("Hyperliquid");
+    expect(el.querySelector(".land-venues")?.textContent).toContain("Bulk");
+    expect(el.querySelector("img.is-light")?.getAttribute("src")).toBe("/welcome/chart-light.png");
+    expect(el.querySelector("img.is-dark")?.getAttribute("src")).toBe("/welcome/chart-dark.png");
     expect(el.querySelector('a[href="/welcome"]')).toBeNull();
     await act(async () => { root.unmount(); });
     el.remove();
