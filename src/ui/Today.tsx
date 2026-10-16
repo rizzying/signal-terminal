@@ -4,6 +4,8 @@ import { fmt, MIN_CANDLES, roundSetup, scan, type Setup } from "../engine/scan";
 import { mmrFor } from "../engine/liq";
 import type { Settings } from "../engine/settings";
 import { loadAlerts, type Alert } from "../alerts";
+import { AlertList } from "./Alerts";
+import { bestShown, rankShown, shortfall, todaySymbols } from "./todayRank";
 import { loadSnap, watchSymbols } from "./Watchlist";
 import { PMOdds, type CalEvent } from "./Calendar";
 import { useVisibleInterval } from "./useVisibleInterval";
@@ -25,12 +27,26 @@ function Tile({ title, go, label, children }: { title: string; go: () => void; l
 }
 export function TodayView({ settings, go, onScan }: { settings: Settings; go: (tab: "scan" | "watch" | "calendar") => void; onScan: (ex: Exchange, sym: string, tf: TF, dir: "long" | "short") => void }) {
   const ex = (localStorage.getItem("sig.ex") as Exchange) || "hyperliquid"; const sym = localStorage.getItem("sig.sym") || "BTC"; const tf = (localStorage.getItem("sig.tf") as TF) || "4h";
-  const [best, setBest] = useState<Setup | null | "err" | "short">(null);
-  useEffect(() => { let live = true; (async () => {
-    try { const [c, ms] = await Promise.all([candles(ex, sym, tf, 400), marketsCached(ex).catch(() => [])]); if (c.length < MIN_CANDLES) { live && setBest("short"); return; }
-      const tick = ms.find((m) => m.symbol === sym)?.tick; const r = (s: Setup) => (tick ? roundSetup(s, (p, m) => roundTick(p, tick, m)) : s);
-      const mk = ms.find((m) => m.symbol === sym); const o = { maxLev: mk?.maxLev, mmr: mmrFor(ex, mk?.maxLev) }; const L = scan(c, "long", settings, o), S = scan(c, "short", settings, o); const pick = L.shown !== S.shown ? (L.shown ? L : S) : L.confidence >= S.confidence ? L : S; live && setBest(r(pick)); }
-    catch { live && setBest("err"); } })(); return () => { live = false; }; }, [ex, sym, tf, settings]);
+  const [board, setBoard] = useState<{ symbol: string; setup: Setup }[] | "err" | null>(null);
+  useEffect(() => { let live = true; const symbols = todaySymbols(sym, watchSymbols(ex)); (async () => {
+    try {
+      const ms = await marketsCached(ex).catch(() => []); const found: { symbol: string; setup: Setup; confidence: number; rr: number }[] = []; let reached = 0;
+      await Promise.all(symbols.map(async (symbol) => {
+        try {
+          const c = await candles(ex, symbol, tf, 400); reached++; if (c.length < MIN_CANDLES) return;
+          const mk = ms.find((m) => m.symbol === symbol); const tick = mk?.tick; const o = { maxLev: mk?.maxLev, mmr: mmrFor(ex, mk?.maxLev) };
+          const round = (s: Setup) => (tick ? roundSetup(s, (p, m) => roundTick(p, tick, m)) : s);
+          const L = round(scan(c, "long", settings, o)), S = round(scan(c, "short", settings, o));
+          const rr = (s: Setup) => Math.max(...s.zones.map((z) => z.rr1));
+          const side = bestShown({ dir: "long", confidence: L.confidence, shown: L.shown, rr: rr(L) }, { dir: "short", confidence: S.confidence, shown: S.shown, rr: rr(S) });
+          if (!side) return; const setup = side === "long" ? L : S; found.push({ symbol, setup, confidence: setup.confidence, rr: rr(setup) });
+        } catch { /* this coin is skipped, not shown as a setup */ }
+      }));
+      if (!live) return;
+      if (!reached) { setBoard("err"); return; }
+      setBoard(rankShown(found).map(({ symbol, setup }) => ({ symbol, setup })));
+    } catch { if (live) setBoard("err"); }
+  })(); return () => { live = false; }; }, [ex, sym, tf, settings]);
   const wex = (localStorage.getItem("sig.watch.lastEx") as Exchange) || ex; const snap = loadSnap(wex);
   const wtf = snap?.tf ?? tf; const wsyms = watchSymbols(wex).slice(0, 12); const byS = new Map((snap?.ex === wex ? snap.rows : []).map((r) => [r.symbol, r]));
   const [pulse, setPulse] = useState<Pulse[] | "err" | null>(null);
@@ -39,18 +55,20 @@ export function TodayView({ settings, go, onScan }: { settings: Settings; go: (t
   useEffect(() => { fetch("/api/calendar").then((r) => (r.ok ? r.json() : Promise.reject())).then((c) => setEv(nextEvent(c.events, Date.now()))).catch(() => setEv("err")); }, []);
   const [now, setNow] = useState(Date.now()); useVisibleInterval(() => setNow(Date.now()), 1000, []);
   const [alerts, setAlerts] = useState<Alert[]>(loadAlerts); useEffect(() => { const f = () => setAlerts(loadAlerts()); addEventListener("sig-alerts", f); return () => removeEventListener("sig-alerts", f); }, []);
-  const active = alerts.filter((a) => !a.firedAt); const hit = alerts.filter((a) => a.firedAt);
-  const z = best && typeof best === "object" ? best.zones[1] : null;
   const pct = (x: number) => `${x >= 0 ? "+" : ""}${(x * 100).toFixed(2)}%`;
+  const gap = board && board !== "err" ? shortfall(board.length) : null;
   return (
     <div className="today rise">
       <div className="today-top">
-      <Tile title={`${sym} · ${tf.toUpperCase()}`} go={() => go("scan")} label="Open scan">
-        <p className="dim small">{EXN[ex]} · current setup</p>
-        {best === null ? <p className="dim" role="status">Scanning…</p> : best === "err" ? <p className="dim">Couldn't load prices right now.</p> : best === "short" ? <p className="dim">Not enough history on this timeframe.</p> :
-          <><p className="big"><span className={`badge ${best.dir}`}>{best.dir}</span> {best.shown ? <b>Setup rule met</b> : <span className="dim">No setup yet</span>} <span className="dim">· {best.band} confidence ({best.confidence}%)</span></p>
-          {z && <dl className="tkv"><div><dt>Zone 2 entry</dt><dd className="mono">{fmt(z.bottom)}–{fmt(z.top)}</dd></div><div><dt>Stop</dt><dd className="mono">{fmt(z.stop)}</dd></div><div><dt>TP1</dt><dd className="mono">{fmt(z.t1)} <span className="dim">({z.rr1.toFixed(1)}R)</span></dd></div></dl>}</>}
-        <div className="tile-foot small">{!alerts.length ? <span className="dim">No alerts. Set one from a zone on Scan.</span> : <span>Alerts: {active.length} watching{hit.length ? ` · ${hit.length} hit` : ""}</span>}</div>
+      <Tile title="Setups" go={() => go("scan")} label="Open scan">
+        <p className="dim small">{EXN[ex]} · {tf.toUpperCase()} · one setup per coin, best ranked. Confidence is signals agreeing, not win chance.</p>
+        {board === null ? <p className="dim" role="status">Scanning…</p> : board === "err" ? <p className="dim">Couldn't load prices right now.</p> :
+          <><ul className="setups">{board.map(({ symbol, setup }) => { const z = setup.zones[1] ?? setup.zones[0]; return <li key={symbol}>
+            <div className="row gap wrap"><b className="mono">{symbol}</b><span className={`badge ${setup.dir}`}>{setup.dir}</span><span className="dim small">{setup.band} · {setup.confidence}%</span>{z?.strength && <span className={`zstr zstr-${z.strength.toLowerCase()}`}>Zone {z.rank} {z.strength}</span>}</div>
+            {z && <dl className="tkv"><div><dt>Entry</dt><dd className="mono">{fmt(z.bottom)}–{fmt(z.top)}</dd></div><div><dt>Stop</dt><dd className="mono">{fmt(z.stop)}</dd></div><div><dt>TP1</dt><dd className="mono">{fmt(z.t1)} <span className="dim">({z.rr1.toFixed(1)}R)</span></dd></div></dl>}
+            <button className="btn sm" onClick={() => onScan(ex, symbol, tf, setup.dir)}>Open {symbol}</button>
+          </li>; })}</ul>{gap && <p className="note" role="status">{gap}</p>}</>}
+        <div className="tile-foot small">{!alerts.length ? <span className="dim">No alerts. Set one from a zone on Scan.</span> : <AlertList alerts={alerts} />}</div>
       </Tile>
       <Tile title="Next event" go={() => go("calendar")} label="Calendar">
         {ev === undefined ? <p className="dim" role="status">Loading…</p> : ev === "err" || ev === null ? <p className="dim">{ev === null ? "No more high-impact US events this month." : "Calendar unavailable right now."}</p> :

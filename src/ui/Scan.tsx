@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { candles as loadCandles, feeFor, marketsCached, roundTick, tfsFor, topOfBook, type Book, type Exchange, type Market, type TF } from "../api/markets";
 import type { Candle } from "../engine/indicators";
 import { analyze, fmt, roundSetup, type Analysis, HTF, MIN_CANDLES, scan, type Dir, type Setup } from "../engine/scan";
+import { zoneWhy } from "../engine/zoneStrength";
 import type { Settings } from "../engine/settings";
 import { db, type ChecklistItem } from "../journal/db";
 import { Chart } from "./Chart";
@@ -107,7 +108,7 @@ export function ScanView({ settings, theme, onJournal, stratId, onPickStrategy }
         <button className="btn long" disabled={!analysis || !!busy} onClick={() => run("long")}>{busy === "long" ? "Scanning…" : "Scan long"}</button>
         <button className="btn short" disabled={!analysis || !!busy} onClick={() => run("short")}>{busy === "short" ? "Scanning…" : "Scan short"}</button>
       </div>
-      {setup && <div className="scanside stack">{setup && <Result pick={copyZone} lev={lev} setLev={setLevS} mmr={ex === "binance" ? null : mmrFor(ex, market?.maxLev)} maxLev={market?.maxLev} analysis={analysis} book={book} ex={ex} setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks, ...(ex === "binance" ? {} : { leverage: lev, liq: checkLiq(setup.zones[zone], setup.dir, lev, mmrFor(ex, market?.maxLev)).liq }) })} onAlert={() => { const z = setup.zones[zone]; addAlert({ exchange: ex, symbol: sym, kind: "zone", lo: z.bottom, hi: z.top, label: `${setup.dir} Zone ${z.rank} entry ${fmt(z.bottom)}–${fmt(z.top)}` }); }} threshold={settings.threshold} />}<AlertsCard /></div>}
+      {setup && <div className="scanside stack">{setup && <Result pick={copyZone} lev={lev} setLev={setLevS} mmr={ex === "binance" ? null : mmrFor(ex, market?.maxLev)} maxLev={market?.maxLev} analysis={analysis} book={book} ex={ex} setup={setup} zone={zone} setZone={setZone} onJournal={() => onJournal({ exchange: ex, symbol: sym, tf, setup, zone, checklist: ticks, ...(ex === "binance" ? {} : { leverage: lev, liq: checkLiq(setup.zones[zone], setup.dir, lev, mmrFor(ex, market?.maxLev)).liq }) })} onAlert={() => { const z = setup.zones[zone]; addAlert({ exchange: ex, symbol: sym, tf, side: setup.dir, zone: z.rank, kind: "zone", lo: z.bottom, hi: z.top, label: `${setup.dir} Zone ${z.rank} entry ${fmt(z.bottom)}–${fmt(z.top)}` }); }} threshold={settings.threshold} />}<AlertsCard /></div>}
       {setup && Object.keys(cmp).length > 0 && <Compare cmp={cmp} current={ex} zone={zone} onPick={(e) => setEx(e)} dir={setup.dir} />}
       {!setup && <AlertsCard />}
       <div className="card">
@@ -144,7 +145,7 @@ function Result({ pick, lev, setLev, mmr, maxLev, analysis, book, ex, setup, zon
       <div className="zones" role="tablist" aria-label="Entry zones">
         {s.zones.map((z, i) => (
           <button key={i} role="tab" aria-selected={zone === i} className={`zone ${zone === i ? "on" : ""}`} onClick={() => pick(i)} title="Select this zone and copy the setup">
-            <div className="row between"><span className="lbl">Zone {z.rank} · {z.name}</span>{z.ready ? <span className="badge long">In zone</span> : <span className="badge">Wait</span>}</div>
+            <div className="row between"><span className="lbl">Zone {z.rank} · {z.name}</span><span className="row gap"><span className={`zstr zstr-${z.strength.toLowerCase()}`} title={zoneWhy(z.facts)}>{z.strength}</span>{z.ready ? <span className="badge long">In zone</span> : <span className="badge">Wait</span>}</span></div>
             <dl className="zkv">
               {([["Entry", `${fmt(z.bottom)} – ${fmt(z.top)}`, ""], ["Median", fmt(z.entry), ""], ["Stop", fmt(z.stop), "neg"], ["TP1", fmt(z.t1), "pos"], ["TP2", fmt(z.t2), "pos"], ["R:R TP1 / TP2", `${z.rr1.toFixed(1)}R / ${z.rr2.toFixed(1)}R`, ""], ...(mmr != null ? [[`Your liq (${lev}×)`, fmt(checkLiq(z, s.dir, lev, mmr).liq), checkLiq(z, s.dir, lev, mmr).beforeStop ? "neg" : ""]] : [])] as const).map(([k, v, c]) => <div className="zr" key={k}><dt>{k}</dt><dd className={c}>{v}</dd></div>)}
             </dl>

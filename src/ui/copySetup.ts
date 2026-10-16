@@ -1,5 +1,6 @@
 import { fmt } from "../engine/scan";
-export type CopyZone = { rank: number; name: string; bottom: number; top: number; stop: number; t1: number; t2: number; rr1: number; rr2: number };
+import type { ZoneGrade } from "../engine/zoneStrength";
+export type CopyZone = { rank: number; name: string; bottom: number; top: number; stop: number; t1: number; t2: number; rr1: number; rr2: number; strength?: ZoneGrade };
 export type CopyInput = { market: string; exchange: string; tf: string; dir: "long" | "short"; zone: CopyZone; confidence: number; band: string; lev: number | null; liq: number | null; liqBeforeStop?: boolean; at: number };
 const wib = (t: number) => new Date(t).toLocaleString("en-GB", { timeZone: "Asia/Jakarta", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
 /** Plain-text setup for the clipboard (one line per field). */
@@ -8,6 +9,7 @@ export function setupText(c: CopyInput): string {
   return [
     `${c.market} · ${c.exchange} · ${c.tf.toUpperCase()} · ${c.dir.toUpperCase()}`,
     `Zone ${z.rank} (${z.name})`,
+    ...(z.strength ? [`Zone strength: ${z.strength}`] : []),
     `Entry: ${fmt(z.bottom)} – ${fmt(z.top)}`,
     `Stop: ${fmt(z.stop)}`,
     `TP1: ${fmt(z.t1)} · TP2: ${fmt(z.t2)}`,
