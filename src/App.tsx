@@ -42,7 +42,7 @@ export default function App() {
   } catch { /* storage blocked: run with defaults */ } finally { setReady(true); } })(); }, []);
   const setSettings = (s: Settings) => { setSettingsS(s); db.set("settings", s); };
   const pickStrategy = (s: Strategy) => { setSettings(s.settings); setStratId(s.id); setActiveId(s.id); };
-  useEffect(() => { document.documentElement.classList.add("dark"); document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#012624"); }, []);
+  useEffect(() => { document.documentElement.classList.add("dark"); document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#edeff2"); }, []);
   useEffect(() => { const f = () => { const h = location.hash.slice(1) as Tab; if (ALL_TABS.some((t) => t.id === h)) setTab(h); }; addEventListener("hashchange", f); return () => removeEventListener("hashchange", f); }, []);
   useEffect(() => { history.replaceState(null, "", `#${tab}`); window.scrollTo(0, 0); }, [tab]);
   const journal = (d: Draft) => {
@@ -75,7 +75,7 @@ export default function App() {
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}
         </Suspense></>}
       </main>
-      <footer className="foot dim small">Signal v3.5.0 · <a href="/welcome">About</a> · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v3.6.0 · <a href="/welcome">About</a> · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }
