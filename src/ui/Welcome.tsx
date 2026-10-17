@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { ParticleSphere } from "./ParticleSphere";
 
 const FEATURES: { lead: string; body: string }[] = [
   { lead: "Setups that agree:", body: "A setup only shows up when market structure agrees with at least 3 other signals." },
@@ -11,38 +12,42 @@ const FEATURES: { lead: string; body: string }[] = [
 ];
 
 export function Welcome() {
-  const [theme, setTheme] = useState(() => (document.documentElement.classList.contains("dark") ? "dark" : "light"));
   useEffect(() => {
-    document.documentElement.classList.add("land-root");
+    document.documentElement.classList.add("land-root", "dark");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#012624");
     return () => document.documentElement.classList.remove("land-root");
   }, []);
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#111111" : "#f5f5f5");
-    try { localStorage.setItem("sig.theme", theme); } catch { /* storage blocked */ }
-  }, [theme]);
   return (
     <div className="land">
       <header className="land-nav">
         <p className="land-mark">Signal</p>
-        <button className="land-theme" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>{theme === "dark" ? "Light" : "Dark"}</button>
-        <a className="land-pill solid" href="/">Open Signal</a>
+        <nav className="land-links" aria-label="On this page">
+          <a href="#what-it-is">What it is</a>
+          <a href="#confidence">How confidence works</a>
+        </nav>
+        <a className="land-cta" href="/">Open Signal</a>
       </header>
       <main>
         <section className="land-hero">
+          <ParticleSphere />
+          <p className="land-eye">Read-only</p>
           <h1>Read the market before you trade it.</h1>
           <p className="land-sub">A free, read-only trading terminal that finds setups across Binance, Hyperliquid and Bulk, then shows you exactly where to look.</p>
           <div className="land-actions">
-            <a className="land-pill solid" href="/">Open Signal</a>
-            <a className="land-pill soft" href="#what-it-does">How it works</a>
+            <a className="land-cta" href="/">Open Signal</a>
+            <a className="land-ghost" href="#what-it-does">How it works</a>
           </div>
         </section>
         <p className="land-venues"><span>Binance</span><span>Hyperliquid</span><span>Bulk</span></p>
         <figure className="land-frame">
-          <img className="is-light" src="/welcome/chart-light.png" alt="Signal chart with entry zones, a stop, and two take profits" />
-          <img className="is-dark" src="/welcome/chart-dark.png" alt="" aria-hidden="true" />
+          <img src="/welcome/chart-dark.png" alt="Signal chart with entry zones, a stop, and two take profits" />
         </figure>
-        <section className="land-block">
+        <ul className="land-stats">
+          <li><b>3</b><span>Exchanges</span></li>
+          <li><b>3</b><span>Entry zones</span></li>
+          <li><b>9</b><span>Funding venues</span></li>
+        </ul>
+        <section className="land-block" id="what-it-is">
           <h2>WHAT IT IS</h2>
           <p className="land-display">Signal scans the market for you and highlights where price structure and other signals line up. It never places trades. You stay in control.</p>
         </section>
@@ -52,7 +57,7 @@ export function Welcome() {
             {FEATURES.map((f) => <li key={f.lead}><p className="land-item">{f.lead}</p><p>{f.body}</p></li>)}
           </ul>
         </section>
-        <section className="land-block">
+        <section className="land-block" id="confidence">
           <h2>HOW CONFIDENCE WORKS</h2>
           <p className="land-display">Low, Med or High is a weighted score of how strongly the signals agree. It is not a win chance.</p>
         </section>
@@ -63,7 +68,7 @@ export function Welcome() {
       </main>
       <footer className="land-close">
         <p>Read-only. No trade execution. Not financial advice.</p>
-        <a className="land-pill solid" href="/">Open Signal</a>
+        <a className="land-cta" href="/">Open Signal</a>
       </footer>
     </div>
   );

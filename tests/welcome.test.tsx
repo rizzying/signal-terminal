@@ -34,8 +34,14 @@ describe("welcome route", () => {
     expect(app).toContain('history.replaceState(null, "", `#${tab}`)');
     expect(app).toContain('href="#scan"');
     expect(app).toContain('href="/welcome">About</a>');
-    expect(app).toContain("Signal v3.4.0");
-    expect(JSON.parse(read("package.json")).version).toBe("3.4.0");
+    expect(app).toContain("Signal v3.5.0");
+    expect(app).not.toContain("Switch to");
+    expect(JSON.parse(read("package.json")).version).toBe("3.5.0");
+    const css = read("src/styles.css");
+    expect(css).toContain("--bg:#012624");
+    expect(css).not.toContain("#f3f1ec");
+    expect(css).not.toContain("#12110e");
+    expect(css.split("rgb(250,209,255)").length - 1).toBe(1);
   });
 
   it("serves welcome meta in its own document", () => {
@@ -94,8 +100,11 @@ describe("welcome route", () => {
     expect(el.querySelector(".land-venues")?.textContent).toContain("Binance");
     expect(el.querySelector(".land-venues")?.textContent).toContain("Hyperliquid");
     expect(el.querySelector(".land-venues")?.textContent).toContain("Bulk");
-    expect(el.querySelector("img.is-light")?.getAttribute("src")).toBe("/welcome/chart-light.png");
-    expect(el.querySelector("img.is-dark")?.getAttribute("src")).toBe("/welcome/chart-dark.png");
+    expect(el.querySelector(".land-stats")?.textContent).toContain("3");
+    expect(el.querySelector(".land-stats")?.textContent).toContain("9");
+    expect(el.querySelector("img")?.getAttribute("src")).toBe("/welcome/chart-dark.png");
+    expect(el.querySelector("canvas.land-sphere")).not.toBeNull();
+    expect(el.querySelector(".land-theme")).toBeNull();
     expect(el.querySelector('a[href="/welcome"]')).toBeNull();
     await act(async () => { root.unmount(); });
     el.remove();
