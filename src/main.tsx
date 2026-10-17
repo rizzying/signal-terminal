@@ -1,4 +1,4 @@
-import "@fontsource-variable/geist";
+import "@fontsource-variable/inter";
 import "@fontsource-variable/geist-mono";
 import "./styles.css";
 import { createRoot } from "react-dom/client";

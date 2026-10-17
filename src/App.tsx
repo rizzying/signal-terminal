@@ -24,7 +24,6 @@ export default function App() {
   const labs = useLabs(); const TABS = ALL_TABS.filter((t) => labAllowed(t.id, labs));
   const [tab, setTab] = useState<Tab>(() => { const h = location.hash.slice(1) as Tab; return h || "today"; });
   useEffect(() => { if (tab === "backtest" && !labs.backtest) setTab("scan"); }, [tab, labs.backtest]);
-  const [theme, setTheme] = useState(() => localStorage.getItem("sig.theme") || "dark");
   const [settings, setSettingsS] = useState<Settings>(DEFAULTS); const [prefill, setPrefill] = useState<Trade | null>(null);
   const [stratId, setStratId] = useState("b-default");
   const [ready, setReady] = useState(false); // settings + strategy loaded from IndexedDB before the first scan (avoids a double scan and layout shift)
@@ -43,7 +42,7 @@ export default function App() {
   } catch { /* storage blocked: run with defaults */ } finally { setReady(true); } })(); }, []);
   const setSettings = (s: Settings) => { setSettingsS(s); db.set("settings", s); };
   const pickStrategy = (s: Strategy) => { setSettings(s.settings); setStratId(s.id); setActiveId(s.id); };
-  useEffect(() => { document.documentElement.classList.toggle("dark", theme === "dark"); document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#12110e" : "#f3f1ec"); localStorage.setItem("sig.theme", theme); }, [theme]);
+  useEffect(() => { document.documentElement.classList.add("dark"); document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#012624"); }, []);
   useEffect(() => { const f = () => { const h = location.hash.slice(1) as Tab; if (ALL_TABS.some((t) => t.id === h)) setTab(h); }; addEventListener("hashchange", f); return () => removeEventListener("hashchange", f); }, []);
   useEffect(() => { history.replaceState(null, "", `#${tab}`); window.scrollTo(0, 0); }, [tab]);
   const journal = (d: Draft) => {
@@ -60,24 +59,23 @@ export default function App() {
           <button className={`more-btn ${TABS.some((t) => t.more && t.id === tab) ? "on" : ""}`} aria-expanded={more} aria-haspopup="menu" onClick={() => setMore(!more)}>More</button>
           {more && <div className="more-menu" role="menu">{TABS.filter((t) => t.more).map((t) => <button key={t.id} role="menuitem" className={tab === t.id ? "on" : ""} onClick={() => { setTab(t.id); setMore(false); }}>{t.name}{t.labs && <span className="labs-badge">Labs</span>}</button>)}</div>}
         </nav>
-        <button className="btn ghost sm" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={() => { const t = theme === "dark" ? "light" : "dark"; document.documentElement.classList.toggle("dark", t === "dark"); setTheme(t); }}>{theme === "dark" ? "Light" : "Dark"}</button>
       </header>
       <main className={`pg-${tab}`}>
         {!ready ? <p className="dim small center" role="status">Loading…</p> : <>
         <Suspense fallback={<p className="dim small center" role="status">Loading…</p>}>
         {tab === "forward" && (labs.forward ? <ForwardView /> : <section className="card stack" data-labs-off><h2>Forward test</h2><p className="dim">This is a Labs feature. Turn on "Forward test" under Labs in Settings to see it.</p></section>)}
         {tab === "today" && <TodayView settings={settings} go={setTab} onScan={(ex, sym, tf, dir) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); sessionStorage.setItem("sig.autoscan", dir); setTab("scan"); }} />}
-        {tab === "scan" && <ScanView stratId={stratId} onPickStrategy={pickStrategy} settings={settings} theme={theme} onJournal={journal} />}
+        {tab === "scan" && <ScanView stratId={stratId} onPickStrategy={pickStrategy} settings={settings} theme="dark" onJournal={journal} />}
         {tab === "watch" && <Watchlist settings={settings} onOpen={(ex, sym, tf) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); setTab("scan"); }} />}
         {tab === "market" && <MarketView />}
-        {tab === "backtest" && labs.backtest && <BacktestView settings={settings} stratId={stratId} theme={theme} />}
+        {tab === "backtest" && labs.backtest && <BacktestView settings={settings} stratId={stratId} theme="dark" />}
         {tab === "calendar" && <CalendarView />}
         {tab === "wallets" && <Wallets />}
         {tab === "journal" && <JournalView prefill={prefill} clearPrefill={() => setPrefill(null)} />}
         {tab === "settings" && <SettingsView settings={settings} setSettings={setSettings} stratId={stratId} onPickStrategy={pickStrategy} />}
         </Suspense></>}
       </main>
-      <footer className="foot dim small">Signal v3.4.0 · <a href="/welcome">About</a> · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
+      <footer className="foot dim small">Signal v3.5.0 · <a href="/welcome">About</a> · Public market data only · no accounts · journal never leaves this device · not financial advice</footer>
     </div>
   );
 }
