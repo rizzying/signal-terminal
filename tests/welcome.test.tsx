@@ -1,4 +1,6 @@
 // @ts-ignore node builtin in tests
+import { createHash } from "node:crypto";
+// @ts-ignore node builtin in tests
 import { readFileSync } from "node:fs";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -34,14 +36,20 @@ describe("welcome route", () => {
     expect(app).toContain('history.replaceState(null, "", `#${tab}`)');
     expect(app).toContain('href="#scan"');
     expect(app).toContain('href="/welcome">About</a>');
-    expect(app).toContain("Signal v3.5.0");
+    expect(app).toContain("Signal v3.6.0");
     expect(app).not.toContain("Switch to");
-    expect(JSON.parse(read("package.json")).version).toBe("3.5.0");
+    expect(JSON.parse(read("package.json")).version).toBe("3.6.0");
     const css = read("src/styles.css");
-    expect(css).toContain("--bg:#012624");
+    expect(css).toMatch(/:root,\.dark\{[^}]*--bg:#edeff2/);
+    expect(css.match(/--bg:#edeff2/g)).toHaveLength(1);
     expect(css).not.toContain("#f3f1ec");
     expect(css).not.toContain("#12110e");
-    expect(css.split("rgb(250,209,255)").length - 1).toBe(1);
+    expect(css).not.toContain("#012624");
+    expect(css).not.toContain("rgb(250,209,255)");
+    expect(css).not.toContain("linear-gradient");
+    const script = read("index.html").match(/<script>([^<]*)<\/script>/)?.[1] ?? "";
+    expect(script).toBe('try{if(localStorage.getItem("sig.theme")==="light")document.documentElement.classList.remove("dark")}catch(e){}');
+    expect(read("vercel.json")).toContain(`sha256-${createHash("sha256").update(script).digest("base64")}`);
   });
 
   it("serves welcome meta in its own document", () => {
@@ -100,10 +108,11 @@ describe("welcome route", () => {
     expect(el.querySelector(".land-venues")?.textContent).toContain("Binance");
     expect(el.querySelector(".land-venues")?.textContent).toContain("Hyperliquid");
     expect(el.querySelector(".land-venues")?.textContent).toContain("Bulk");
-    expect(el.querySelector(".land-stats")?.textContent).toContain("3");
-    expect(el.querySelector(".land-stats")?.textContent).toContain("9");
+    expect(el.querySelector(".land-stats")).toBeNull();
+    expect(el.querySelector("canvas")).toBeNull();
     expect(el.querySelector("img")?.getAttribute("src")).toBe("/welcome/chart-dark.png");
-    expect(el.querySelector("canvas.land-sphere")).not.toBeNull();
+    expect(el.querySelector(".land-hero")).not.toBeNull();
+    expect(el.querySelector(".land-widget")).not.toBeNull();
     expect(el.querySelector(".land-theme")).toBeNull();
     expect(el.querySelector('a[href="/welcome"]')).toBeNull();
     await act(async () => { root.unmount(); });

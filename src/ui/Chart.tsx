@@ -35,7 +35,7 @@ export function Chart({ onPickPrice, candles, analysis, setup, zone, theme, view
   }, [theme, ready]);
   function applyTheme() {
     const c = chart.current; if (!c) return; const ink2 = css("--ink-2"), line = css("--line-soft"), pos = css("--pos"), neg = css("--neg");
-    c.applyOptions({ layout: { background: { color: "transparent" }, textColor: ink2, fontFamily: "Geist Mono Variable, ui-monospace, monospace", fontSize: 11 }, grid: { vertLines: { color: line }, horzLines: { color: line } } }); if (el.current) el.current.dataset.grid = line;
+    c.applyOptions({ layout: { background: { color: "transparent" }, textColor: ink2, fontFamily: "Inter Variable, Inter, system-ui, sans-serif", fontSize: 11 }, grid: { vertLines: { color: line }, horzLines: { color: line } } }); if (el.current) el.current.dataset.grid = line;
     series.current?.applyOptions({ upColor: pos, downColor: neg, wickUpColor: pos, wickDownColor: neg });
     drawLines();
   }
@@ -57,7 +57,7 @@ export function Chart({ onPickPrice, candles, analysis, setup, zone, theme, view
     return () => { cancelAnimationFrame(raf); ro.disconnect(); try { c.timeScale().unsubscribeVisibleLogicalRangeChange(f); } catch { /* removed */ } };
   }, [ready]);
   drawRef.current = (force?: boolean) => drawLines(force);
-  function drawLines(force = true) { const sp = lineSpecs(setup, zone, analysis, { accent: css("--accent"), neg: css("--neg"), pos: css("--pos"), warn: css("--ink-3") }, yourLiq); const s = series.current; lines.current?.sync(s ? declutter(sp, (p) => s.priceToCoordinate(p)) : sp, force); if (el.current) el.current.dataset.lines = String(lines.current?.count ?? 0); }
+  function drawLines(force = true) { const sp = lineSpecs(setup, zone, analysis, { accent: css("--chart"), neg: css("--neg"), pos: css("--pos"), warn: css("--ink-3") }, yourLiq); const s = series.current; lines.current?.sync(s ? declutter(sp, (p) => s.priceToCoordinate(p)) : sp, force); if (el.current) el.current.dataset.lines = String(lines.current?.count ?? 0); }
   useEffect(() => {
     const s = series.current; if (!s) return;
     drawLines();
@@ -65,7 +65,7 @@ export function Chart({ onPickPrice, candles, analysis, setup, zone, theme, view
     if (analysis && candles.length) {
       const t = (i: number) => (candles[i].t / 1000) as Time; const from = candles.length - 150;
       for (const p of analysis.pivots) if (p.label && p.i >= from) marks.push({ time: t(p.i), position: p.kind === "high" ? "aboveBar" : "belowBar", color: css("--ink-3"), shape: "circle", size: 0, text: p.label });
-      for (const b of analysis.breaks) if (b.i >= from) marks.push({ time: t(b.i), position: b.dir === "bull" ? "belowBar" : "aboveBar", color: css("--accent"), shape: b.dir === "bull" ? "arrowUp" : "arrowDown", text: b.choch ? "ChoCH" : "BoS" });
+      for (const b of analysis.breaks) if (b.i >= from) marks.push({ time: t(b.i), position: b.dir === "bull" ? "belowBar" : "aboveBar", color: css("--chart"), shape: b.dir === "bull" ? "arrowUp" : "arrowDown", text: b.choch ? "ChoCH" : "BoS" });
       if (ew) { const f = elliottOverlay(candles); setEwFound(!!f); if (f) for (const l of f.labels) marks.push({ time: t(l.i), position: l.kind === "high" ? "aboveBar" : "belowBar", color: css("--warn-ew"), shape: "square", size: 0, text: `(${l.text})` }); }
       marks.sort((a, b) => (a.time as number) - (b.time as number));
     }
@@ -75,7 +75,7 @@ export function Chart({ onPickPrice, candles, analysis, setup, zone, theme, view
     const c = chart.current; if (!c) return;
     if (!oi?.length) { if (oiSeries.current) { c.removeSeries(oiSeries.current); oiSeries.current = null; } return; }
     if (!oiSeries.current) { oiSeries.current = c.addLineSeries({ priceScaleId: "oi", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, title: "OI" }); c.priceScale("oi").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 }, visible: false }); }
-    oiSeries.current.applyOptions({ color: css("--accent") });
+    oiSeries.current.applyOptions({ color: css("--chart") });
     const t0 = candles[0]?.t ?? 0; const seen = new Set<number>();
     oiSeries.current.setData(oi.filter((p) => p.t >= t0 && p.oiUsd > 0).map((p) => ({ time: (p.t / 1000) as Time, value: p.oiUsd })).filter((p) => !seen.has(p.time as number) && (seen.add(p.time as number), true)));
   }, [oi, theme, candles]);
