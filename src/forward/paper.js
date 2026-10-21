@@ -20,11 +20,12 @@ export function verdict(n, ci) {
   return { key: "collecting", label: "Collecting", why: `${FIRST_READ - n} more closed trades to a first read` };
 }
 const num = (x) => (x == null ? null : Number(x));
+export const isWin = (r) => r > 0;
 export function scorecard(trades) {
   const T = trades.map((t) => ({ ...t, r_net: num(t.r_net), exit_t: num(t.exit_t), fill_t: num(t.fill_t) }));
   const closed = T.filter((t) => t.status === "closed").sort((a, b) => a.exit_t - b.exit_t); const rs = closed.map((t) => t.r_net);
   const c = (s) => T.filter((t) => t.status === s).length; const filled = closed.length + c("open"); const noTrade = c("cancelled") + c("expired");
-  const wins = rs.filter((r) => r > 0), losses = rs.filter((r) => r <= 0); const gw = wins.reduce((a, x) => a + x, 0), gl = -losses.reduce((a, x) => a + x, 0);
+  const wins = rs.filter(isWin), losses = rs.filter((r) => r <= 0); const gw = wins.reduce((a, x) => a + x, 0), gl = -losses.reduce((a, x) => a + x, 0);
   const ci = meanCI(rs); const dd = maxDdR(rs); let cum = 0;
   return { n: closed.length, pending: c("pending"), open: c("open"), cancelled: c("cancelled"), expired: c("expired"), filled,
     fillRate: filled + noTrade ? filled / (filled + noTrade) : null, winRate: rs.length ? wins.length / rs.length : null,
