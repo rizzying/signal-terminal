@@ -80,6 +80,16 @@ The headline book also keeps the finish line, judged on **that book's three coin
 
 v1 is a separate legacy card. It is not added into the 1H Zone 2 v2 numbers. Sample sizes split across the nine books, so each book will take longer to reach 30 and 100 than the old single book did.
 
+## Report splits
+
+Each card's closed trades are also split two ways: zone strength (Strong, OK, Weak) and confidence (Low, Med, High), both as the trade had them when it was placed. Each slice shows closed trades, win rate, average R and total R. A slice under 30 closed trades is marked too early. The slices of a card always add up to that card's closed count and total R.
+
+- The split is served on `/api/paper` only. `/api/forward` does not carry it.
+- Confidence is the stored `conf`, cut the same way as the app (above 70 High, 50 to 70 Med, below 50 Low).
+- Strength comes from a replay. After each hourly run, `src/forward/grade.ts` rebuilds the 400 closed candles the trader saw before placement and runs the trader's own plan builder. The grade is kept only when the replay gives the stored entry, stop, target and confidence exactly. It is written once to `fwd_grades` and never changes. Nothing in the trader reads it.
+- Unknown means the replay could not prove the placement: another rules hash, an order moved after placement (v1), no stored confidence, missing candles, no setup in the replay, or a number that does not match. A trade not graded yet is Unknown until the next hourly run. The page lists every Unknown trade with the reason.
+- Kill and promote ignore the split. They use the whole scorecard.
+
 ## Versioning and the database
 
 - New trades and events are written with their book's strategy id (`bn-<tf>-z<n>-v2`) and that book's rules hash.

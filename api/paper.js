@@ -3,6 +3,7 @@ import { shadowReplay, shadowSummary, unrealR, openWhatIfR, excursion, mergeExc 
 import { neon } from "@neondatabase/serverless";
 import { scoreboards, parseTradeFilters, filterTrades, tradeCounts, tradesCsv, todayByBook, STRATEGY_ID, STRATEGY_NAME, RULES_HASH, MARKETS, reportBooks } from "../src/forward/paper.js";
 import { TF_MS, TF_INTERVAL, bookOf } from "../src/forward/books.js";
+import { splitBoards } from "../src/forward/split.js";
 export const config = { maxDuration: 20 };
 const riskParam = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 && n <= 1e7 ? n : 100; };
 const tfOf = (t) => bookOf(t.strategy)?.tf ?? "1h";
@@ -13,15 +14,16 @@ export default async function handler(req, res) {
   try {
     const sql = neon(url); const q = req.query ?? {}; const f = parseTradeFilters(q);
     const ids = reportBooks().map((b) => b.id);
-    const has = (await sql.query(`select 1 from information_schema.tables where table_name = 'fwd_trades'`)).length > 0;
-    const [T, runs, cur, ev, lim] = has ? await Promise.all([
+    const tabs = new Set((await sql.query(`select table_name from information_schema.tables where table_name in ('fwd_trades', 'fwd_grades')`)).map((r) => r.table_name));
+    const [T, runs, cur, ev, lim, G] = tabs.has("fwd_trades") ? await Promise.all([
       sql.query(`select * from fwd_trades where strategy in (${ph(ids)}) order by placed_t desc, id desc limit 20000`, ids),
       sql.query(`select at, paper, (errors is not null) as had_errors from fwd_runs order by id desc limit 1`),
       sql.query(`select strategy, market, last_t from fwd_trader where strategy in (${ph(ids)}) order by strategy, market`, ids),
       sql.query(`select strategy, market, trade_key, kind, t, data from fwd_events where strategy in (${ph(ids)}) order by t desc, id desc limit 80`, ids),
       sql.query(`select strategy, market, t from fwd_events where strategy in (${ph(ids)}) and kind = 'limit' and t > $${ids.length + 1}`, [...ids, Date.now() - 2 * 864e5]),
-    ]) : [[], [], [], [], []];
-    const boards = scoreboards(T); const headline = boards.find((b) => b.headline) ?? boards[0];
+      tabs.has("fwd_grades") ? sql.query(`select g.key, g.verdict, g.strength, g.facts from fwd_grades g join fwd_trades t using (key) where t.strategy in (${ph(ids)})`, ids) : [],
+    ]) : [[], [], [], [], [], []];
+    const split = splitBoards(T, G); const boards = scoreboards(T).map((b) => ({ ...b, split: split[b.id] })); const headline = boards.find((b) => b.headline) ?? boards[0];
     const now = Date.now(); const need = new Map();
     for (const t of T) {
       const key = `${t.market}|${tfOf(t)}`;

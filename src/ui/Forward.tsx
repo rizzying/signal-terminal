@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { parseTradeId, tradeId } from "../forward/paper.js";
 import { bookOf, TF_LABEL } from "../forward/books.js";
+import { SPLITS } from "../forward/split.js";
 import { SHADOW_LABEL } from "../forward/shadow.js";
 import { TOAST_MS } from "./copySetup";
 import { LATEST, VERSIONS, VERSION_LABEL } from "../forward/version.js";
@@ -137,7 +138,9 @@ export function SignalLog() {
 // ───────── v3.0: the forward test is a virtual trader running one frozen strategy ─────────
 type PT = { mfe?: number | null; mae?: number | null; now?: number; ur?: number | null; id: number; key: string; strategy?: string; market: string; side: "long" | "short"; status: string; placed_t: number; entry: number; sl: number; tp: number; risk: number; replaced: number; fill_t: number | null; exit_t: number | null; exit_px: number | null; exit_reason: string | null; bars: number; cost_r: number | null; funding_r: number | null; funding_src: string | null; r_net: number | null };
 type PScore = { n: number; pending: number; open: number; cancelled: number; expired: number; filled: number; fillRate: number | null; winRate: number | null; expR: number | null; ciLo: number | null; ciHi: number | null; pf: number | null; maxDdR: number; totalR: number; verdict: { key: string; label: string; why: string }; equity: { t: number; r: number }[] };
-type Board = { id: string; name: string; tf: string; zone: number; headline: boolean; legacy: boolean; rulesHash: string | null; n: number; pending: number; open: number; cancelled: number; expired: number; filled: number; fillRate: number | null; tp: number; sl: number; tpRate: number | null; slRate: number | null; avgR: number | null; sample: { closed: number; filled: number; cancelled: number; expired: number; tp: number; sl: number }; score?: PScore };
+type Slice = { level: string; n: number; wins: number; winRate: number | null; avgR: number | null; totalR: number; early: boolean };
+type BookSplit = { strength: Slice[]; conf: Slice[]; unknown: { id: string; key: string; market: string; side: "long" | "short"; status: string; tstatus: string; placed_t: number; reason: string; detail: string }[] };
+type Board = { id: string; name: string; tf: string; zone: number; headline: boolean; legacy: boolean; rulesHash: string | null; n: number; pending: number; open: number; cancelled: number; expired: number; filled: number; fillRate: number | null; tp: number; sl: number; tpRate: number | null; slRate: number | null; avgR: number | null; sample: { closed: number; filled: number; cancelled: number; expired: number; tp: number; sl: number }; score?: PScore; split?: BookSplit };
 type PData = { configured: boolean; error?: string; strategy?: { id: string; name: string; rulesHash: string; markets: string[] }; lastRun?: { at: string; paper?: string } | null; cursor?: { market: string; last_t: number }[];
   score?: PScore; scorecards?: Board[]; counts?: Record<string, Record<string, number>>; total?: number; trades?: PT[]; events?: { strategy?: string; market: string; trade_key: string | null; kind: string; t: number; data: any }[]; today?: Record<string, Record<string, { r: number; hit: boolean; limit: number }>>;
   shadow?: { note: string; error?: string; summary?: { cancelled: number; filled: number; closed: number; netR: number; open: number; pending: number; openR?: { n: number; r: number } }; rows?: Record<string, { status: string; fill_t: number | null; exit_t: number | null; exit_px: number | null; r: number | null; mfe?: number | null; mae?: number | null; now?: number | null; ur?: number | null }> } | null };
@@ -158,6 +161,22 @@ function Equity({ pts }: { pts: { t: number; r: number }[] }) {
     <line x1="0" x2={W} y1={y(0)} y2={y(0)} className="zero" /><path d={d} className={pts.at(-1)!.r >= 0 ? "up" : "down"} /></svg>;
 }
 const rateOf = (k: number, n: number, rate: number | null) => (!n || rate == null ? "–" : `${Math.round(rate * 100)}% (${k}/${n})`);
+const ZSTR = ["Strong", "OK", "Weak"];
+function Splits({ split, name, risk, find }: { split: BookSplit; name: string; risk: number; find: (id: string) => void }) {
+  const u = split.unknown;
+  return <>
+    <div className="fbreak">{SPLITS.map((a: { key: "strength" | "conf"; title: string }) => <div key={a.key} className="card"><h3>{a.title} · {name}</h3>
+      <table className="rt"><thead><tr><th>{a.title}</th><th>Closed</th><th>Win rate</th><th>Avg per trade</th><th>Total</th></tr></thead>
+        <tbody>{split[a.key].filter((s) => s.n || s.level !== "Unknown").map((s) => <tr key={s.level} className={s.n ? "" : "dim"}>
+          <td data-label={a.title}><span>{ZSTR.includes(s.level) ? <span className={`zstr zstr-${s.level.toLowerCase()}`}>{s.level}</span> : s.level}{s.early && <> <span className="badge" title={`${s.n} closed. A first read needs 30.`}>too early</span></>}</span></td>
+          <td data-label="Closed" className="num">{s.n}</td><td data-label="Win rate" className="num">{rateOf(s.wins, s.n, s.winRate)}</td>
+          <td data-label="Avg per trade" className={`num ${s.avgR == null ? "" : s.avgR >= 0 ? "pos" : "neg"}`}><span><M r={s.avgR} risk={risk} /></span></td>
+          <td data-label="Total" className={`num ${!s.n ? "" : s.totalR >= 0 ? "pos" : "neg"}`}><span><M r={s.n ? s.totalR : null} risk={risk} /></span></td></tr>)}</tbody></table></div>)}</div>
+    <p className="dim small">Strength and confidence are what each trade had when it was placed. Under 30 closed trades is too early to read. These splits are for reading only. Kill and promote use the whole scorecard.</p>
+    {!!u.length && <details className="card"><summary><b>Unknown strength</b> <span className="dim small">{u.length} trade{u.length === 1 ? "" : "s"} on {name}</span></summary>
+      <ul className="evlist small">{u.map((x) => <li key={x.key}><button className="btn ghost sm mono" aria-label={`Find ${x.id} in the trade list`} onClick={() => find(x.id)}>{x.id}</button> {x.market.replace(/USDT$/, "")} <span className={`badge ${x.side}`}>{x.side}</span> <span className="dim">{wib(x.placed_t)} · {PSTAT[x.tstatus]}</span> {x.detail}</li>)}</ul></details>}
+  </>;
+}
 export function ForwardView() {
   const [f, setF] = useState<Record<string, string | undefined>>({}); const [d, setD] = useState<PData | null>(null); const [err, setErr] = useState(""); const [log, setLog] = useState(false); const [focus, setFocus] = useState("");
   const risk = useRisk(); const [idq, setIdq] = useState(""); const idNum = parseTradeId(idq);
@@ -214,6 +233,7 @@ export function ForwardView() {
         <span className="mono">Avg <M r={b.avgR} risk={risk} /></span>
       </button>)}</div>
       <div className="statrow">{stats.map(([k, v, sub]) => <div key={k} className="card stat"><span className="lbl">{k}</span><b className="mono">{v}</b>{sub && <span className="dim small">{sub}</span>}{small && k !== "Closed trades" && s.n > 0 && <span className="badge">small sample</span>}</div>)}</div>
+      {board?.split && <Splits split={board.split} name={board.name} risk={risk} find={setIdq} />}
       <div className="fgrid">
         <div className="card"><h3>Equity · {board?.name ?? st.name}</h3><Equity pts={s.equity} /></div>
         <div className="card"><h3>Now · {board?.name ?? st.name}</h3>{st.markets.map((m) => { const t = live.find((x) => x.market === m); const td = day[m]; return <div key={m} className="row between nowrow"><b>{m.replace(/USDT$/, "")} <span className={`mono small ${td && td.r < 0 ? "neg" : td && td.r > 0 ? "pos" : "dim"}`} title="Realized P&L today (WIB), this scorecard only">today <M r={td?.r ?? 0} risk={risk} /> <span className="dim">· limit {usd(td?.limit ?? -3, risk)}</span></span>{td?.hit && <span className="badge v-kill" title={`Lost ${usd(3, risk).slice(1)} (3R) today on this scorecard: no new orders until 00:00 WIB`}>daily limit hit</span>}</b>{t ? <span className="small">{t.status === "open" ? "Position" : "Limit order"} <span className={`badge ${t.side}`}>{t.side}</span> @ <b className="mono">{fmt(t.entry)}</b> · SL <span className="neg mono">{fmt(t.sl)}</span> · TP <span className="pos mono">{fmt(t.tp)}</span>{t.replaced ? ` · moved ${t.replaced}×` : ""}</span> : <span className="dim small">{td?.hit ? "paused until 00:00 WIB" : "flat"}</span>}</div>; })}
