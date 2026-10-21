@@ -12,7 +12,9 @@ const p = await paperJob(q, { tx });
 const l = await resolveLegacy(q);
 await q(`insert into fwd_runs (inserted, resolved, errors, paper) values ($1,$2,$3,$4)`, [0, l.resolved, [...p.errors, ...l.errors].join("; ") || null, JSON.stringify({ events: p.events, closed: p.closed, funding: p.funding })]);
 console.log(`done: paper ${p.events} events, ${p.closed} closed (funding: ${p.funding ?? "n/a"}); legacy ${l.resolved} status changes; ${p.errors.length + l.errors.length} errors`);
-// Report-only grading. Loaded after the run row so a broken grader can't stop the recorder or change the exit code.
-try { const { gradeJob } = await import("../src/forward/grade"); const g = await gradeJob(q); console.log(`grades: ${g.graded} new, ${g.unknown} unknown`); for (const e of g.errors) console.log(`::warning::grading: ${e}`); }
-catch (e: any) { console.log(`::warning::grading skipped: ${String(e?.message ?? e).slice(0, 200)}`); }
+const gradeAfterRun = async () => {
+  try { const { gradeJob } = await import("../src/forward/grade"); const g = await gradeJob(q); console.log(`grades: ${g.graded} new, ${g.unknown} unknown`); for (const e of g.errors) console.log(`::warning::grading: ${e}`); }
+  catch (e: any) { console.log(`::warning::grading skipped: ${String(e?.message ?? e).slice(0, 200)}`); }
+};
+await gradeAfterRun();
 if (p.errors.length >= 3) process.exit(1);

@@ -1,3 +1,4 @@
+import { confidenceCuts } from "./bands.js";
 import { atr, ema, rsi, type Candle } from "./indicators";
 import { estimateLiqMap } from "./liqmap";
 import { DEFAULTS, type Settings, type SignalKey, SIGNAL_NAMES } from "./settings";
@@ -260,7 +261,7 @@ export function scan(c: Candle[], dir: Dir, s: Settings, opts: { maxLev?: number
   if (conf < s.threshold) fails.push(`confidence ${conf}% is under your ${s.threshold}% filter`);
   return { dir, confidence: conf, band: confidenceBand(conf), othersAgree, othersTotal: others.length, structureOk, reason: fails.join("; "), shown: !fails.length, signals, zones: gradeZones(buildZones(c, an, dir, s, opts.costs), signals), htf: s.useHtf && opts.htfTf ? htfAgree(opts.htf ?? null, dir, s, opts.htfTf) : undefined, price: c.at(-1)!.c, atr: an.atr };
 }
-export const confidenceBand = (c: number): "Low" | "Medium" | "High" => (c > 70 ? "High" : c >= 50 ? "Medium" : "Low");
+export const confidenceBand = (c: number): "Low" | "Medium" | "High" => confidenceCuts(c);
 /** Re-grade zones once the setup's signals exist. Prices and rank stay as buildZones left them. */
 export function gradeZones(zones: Zone[], signals: Signal[]): Zone[] {
   const on = (key: SignalKey) => { const x = signals.find((s) => s.key === key); return !!x && x.weight > 0 && x.pass; };

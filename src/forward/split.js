@@ -1,5 +1,4 @@
-// Report-only split of each scorecard's closed trades by zone strength and confidence at placement.
-// Plain JS for api/paper.js and the page. Kill and promote never read it.
+import { confidenceCuts } from "../engine/bands.js";
 import { FIRST_READ, isWin, tradeId, tstatus } from "./paper.js";
 import { reportBooks } from "./books.js";
 
@@ -7,11 +6,11 @@ export const SPLITS = [
   { key: "strength", title: "Zone strength", levels: ["Strong", "OK", "Weak", "Unknown"] },
   { key: "conf", title: "Confidence", levels: ["Low", "Med", "High", "Unknown"] },
 ];
-/** Same cuts as confidenceBand in src/engine/scan.ts, with the report word Med. A missing value is Unknown, never Low. */
+const REPORT_BAND = { Low: "Low", Medium: "Med", High: "High" };
 export function confBand(conf) {
   if (conf == null || conf === "") return "Unknown";
   const n = Number(conf);
-  return !Number.isFinite(n) ? "Unknown" : n > 70 ? "High" : n >= 50 ? "Med" : "Low";
+  return !Number.isFinite(n) ? "Unknown" : REPORT_BAND[confidenceCuts(n)];
 }
 const WORD = { entry: "entry", sl: "stop", tp: "target", conf: "confidence" };
 const DETAIL = {

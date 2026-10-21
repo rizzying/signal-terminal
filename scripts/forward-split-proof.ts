@@ -1,5 +1,3 @@
-// Read-only proof of the report split: the public /api/paper payload and public Binance klines, graded with the job's own gradeRows.
-// No database client. Run: npx tsx scripts/forward-split-proof.ts (URL=... to point at another deploy).
 import { gradeRows, parsePlaced } from "../src/forward/grade";
 import { splitBoards, SPLITS } from "../src/forward/split.js";
 import { bookOf, TF_MS } from "../src/forward/books.js";

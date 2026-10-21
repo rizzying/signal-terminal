@@ -1,5 +1,3 @@
-// Placement grade per paper trade, written once to fwd_grades after the hourly run for the report split.
-// The only writer of fwd_grades. Nothing in the trader, the recorder or the verdict reads it.
 import type { Candle } from "../engine/indicators";
 import { scan } from "../engine/scan";
 import type { ZoneGrade } from "../engine/zoneStrength";
@@ -11,7 +9,6 @@ import type { Q } from "./db";
 export type Reason = "rules" | "moved" | "no-conf" | "candles" | "no-setup" | "mismatch";
 export type Grade = { verdict: "ok"; strength: ZoneGrade } | { verdict: Reason; facts: Record<string, unknown> };
 export type GradeRow = { key: string } & Grade;
-/** The fwd_trades fields a grade reads, parsed once at the boundary. */
 export type Placed = { key: string; strategy: string; rulesHash: string; market: string; side: Side; placedT: number; entry: number; sl: number; tp: number; conf: number | null; replaced: number };
 /** Binance spot candles of one interval whose open time is in [from, to], oldest first. */
 export type RangeFetch = (market: string, interval: string, from: number, to: number, signal?: AbortSignal) => Promise<Candle[]>;
@@ -29,7 +26,6 @@ type Field = "entry" | "sl" | "tp" | "conf";
 const mismatch = (fields: Field[], replay: Partial<Record<Field, number | null>>, t: Placed): Grade =>
   ({ verdict: "mismatch", facts: { fields, replay: Object.fromEntries(fields.map((f) => [f, replay[f]])), stored: Object.fromEntries(fields.map((f) => [f, t[f]])) } });
 
-/** The gate, first failure wins. ok only when the trader's own plan builder reproduces every stored number exactly. */
 export function gradeTrade(t: Placed, closed: Candle[]): Grade {
   const book = bookOf(t.strategy)!; const bar = TF_MS[book.tf];
   const want = t.strategy === LEGACY_STRATEGY ? LEGACY_HASH : BOOK_HASH[t.strategy];
@@ -63,22 +59,20 @@ export const rangeKlines: RangeFetch = async (m, interval, from, to, signal) => 
   return [...by.values()].sort((a, b) => a.t - b.t);
 };
 
-/** One ranged fetch per market × timeframe. A fetch error grades nothing in that group, so the next run retries it. */
-export async function gradeRows(rows: Placed[], klines: RangeFetch = rangeKlines, signal?: AbortSignal): Promise<{ grades: GradeRow[]; errors: string[] }> {
+export async function gradeRows(rows: Placed[], klines: RangeFetch = rangeKlines, signal?: AbortSignal): Promise<{ grades: GradeRow[]; errors: string[]; skipped: string[] }> {
   const groups = new Map<string, Placed[]>();
   for (const r of rows) { const k = `${r.market}|${bookOf(r.strategy)!.tf}`; groups.set(k, [...(groups.get(k) ?? []), r]); }
-  const grades: GradeRow[] = []; const errors: string[] = [];
+  const grades: GradeRow[] = []; const errors: string[] = []; const skipped: string[] = [];
   await Promise.all([...groups].map(async ([k, rs]) => {
     const [m, tf] = k.split("|"); const bar = TF_MS[tf]; const ts = rs.map((r) => r.placedT);
     let closed: Candle[];
     try { closed = await klines(m, TF_INTERVAL[tf], Math.min(...ts) - (SPEC.window + 1) * bar, Math.max(...ts) - bar, signal); }
-    catch (e: any) { errors.push(`${m} ${tf}: ${String(e?.message ?? e).slice(0, 200)}`); return; }
+    catch (e: any) { errors.push(`${m} ${tf}: ${String(e?.message ?? e).slice(0, 200)}`); skipped.push(...rs.map((r) => r.key)); return; }
     for (const r of rs) grades.push({ key: r.key, ...gradeTrade(r, closed) });
   }));
-  return { grades, errors };
+  return { grades, errors, skipped };
 }
 
-/** Grades every report-book trade that has no row yet. Idempotent: a second run inserts nothing. */
 export async function gradeJob(q: Q, o: { klines?: RangeFetch; budgetMs?: number } = {}): Promise<{ graded: number; unknown: number; errors: string[] }> {
   const ms = o.budgetMs ?? GRADE_BUDGET_MS; const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(new Error(`grading ran past its ${ms / 1000}s budget`)), ms);
