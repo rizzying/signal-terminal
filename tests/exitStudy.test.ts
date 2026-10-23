@@ -2,7 +2,7 @@
 import { step, settle, type State, type Trade } from "../src/forward/trader";
 import type { Candle } from "../src/engine/indicators";
 import { excursion } from "../src/forward/shadow.js";
-import { confBand, median, mfeIncludingFill, pageMfe, pathMfe, replay, score, targetAt, targetAudit, type Leg } from "../scripts/exitStudy";
+import { blankRule, betterProfit, chooseBest, chronoSplit, confBand, median, mfeIncludingFill, pageMfe, pathMfe, profitDdRatio, replay, replayRule, riskScore, ruleFromVariant, score, SWEEP, targetAt, targetAudit, TIME_BARS, VARIANTS, type Leg } from "../scripts/exitStudy";
 
 const H = 3.6e6; const M = "BTCUSDT";
 const k = (i: number, o: number, h: number, l: number, c: number): Candle => ({ t: i * H, o, h, l, c, v: 1 });
@@ -86,4 +86,44 @@ it("a short trail ratchets the stop down and a small sample is marked early", ()
   expect(confBand(null)).toBe("Unknown"); expect(confBand(70)).toBe("Med"); expect(confBand(71)).toBe("High"); expect(confBand(49)).toBe("Low");
   expect(score([{ r: 1, exitT: 1 }, { r: -1, exitT: 2 }]).early).toBe(true);
   expect(median([1, 3, 2, 4])).toBe(2.5);
+  for (const v of VARIANTS) {
+    const a = replay(s, bars, v, "stopFirst");
+    const b = replayRule(s, bars, ruleFromVariant(v), "stopFirst");
+    expect(b.reason).toBe(a.reason); expect(b.exitT).toBe(a.exitT); expect(b.r).toBe(a.r);
+  }
+});
+
+it("a shorter time stop exits sooner, and a tighter trail keeps more of the move", () => {
+  const quiet = [k(1, 101, 101, 99, 100)];
+  for (let i = 2; i <= 9; i++) quiet.push(k(i, 100, 101, 99.5, 100.2));
+  const four = replayRule(leg, quiet, { ...blankRule(), timeBars: 4 }, "stopFirst");
+  expect(four.reason).toBe("time"); expect(four.exitT).toBe(6 * H);
+  const run = [k(0, 101, 102, 100.5, 101), k(1, 101, 101, 99, 100), k(2, 100, 121, 100.5, 118), k(3, 118, 118, 104, 106), k(4, 106, 107, 89, 90)];
+  const tight = replayRule(leg, run, { ...blankRule(), trailArm: 1, trailDist: 0.5 }, "stopFirst");
+  const wide = replayRule(leg, run, { ...blankRule(), trailArm: 1, trailDist: 2 }, "stopFirst");
+  expect(tight.reason).toBe("trail"); expect(tight.r).toBeGreaterThan(0); expect(tight.r!).toBeGreaterThan(wide.r!);
+  const part = replayRule(leg, [k(0, 101, 102, 100.5, 101), k(1, 101, 101, 99, 100), k(2, 100, 111, 100, 110), k(3, 110, 111, 99, 100)], { ...blankRule(), partialFrac: 0.25, partialAt: 1 }, "stopFirst");
+  expect(part.reason).toBe("be"); expect(part.r).toBeGreaterThan(0); expect(part.r!).toBeLessThan(1);
+});
+
+it("the tune set is the first two thirds by fill time, and the pick ignores the holdout", () => {
+  const rows = [5, 1, 3, 2, 4].map((fillT) => ({ id: `F-${fillT}`, fillT }));
+  const split = chronoSplit(rows);
+  expect(split.train.map((r) => r.fillT)).toEqual([1, 2, 3]);
+  expect(split.test.map((r) => r.fillT)).toEqual([4, 5]);
+  const picked = chooseBest([
+    { id: "thin", rows: [{ r: 1, exitT: 1 }, { r: -0.2, exitT: 2 }] },
+    { id: "deep", rows: [{ r: 3, exitT: 1 }, { r: -2, exitT: 2 }] },
+  ]);
+  expect(picked!.id).toBe("thin");
+  expect(picked!.score.ratio).toBeGreaterThan(1);
+  expect(riskScore([{ r: -1, exitT: 2 }, { r: -1, exitT: 1 }, { r: 0, exitT: 3 }, { r: 1, exitT: 4 }]).loseStreak).toBe(3);
+  expect(profitDdRatio(10, -5)).toBe(2);
+  expect(profitDdRatio(-10, -5)).toBe(-2);
+  expect(profitDdRatio(1, 0)).toBe(Infinity);
+  expect(betterProfit(riskScore([{ r: 2, exitT: 1 }]), riskScore([{ r: 1, exitT: 1 }]))).toBe(true);
+  expect(TIME_BARS[0]).toBe(4); expect(TIME_BARS.at(-1)).toBe(32);
+  expect(SWEEP.map((f) => f.rules.length)).toEqual([15, 16, 4, 12, 5, 64]);
+  expect(riskScore([{ r: -1.5, exitT: 1 }]).totalUsd).toBe(-150);
+  expect(riskScore([{ r: 1, exitT: 1 }, { r: -1, exitT: 2 }]).early).toBe(true);
 });

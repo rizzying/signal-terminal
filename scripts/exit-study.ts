@@ -5,7 +5,7 @@ import type { Candle } from "../src/engine/indicators";
 import { plansByZone, SPEC } from "../src/forward/trader";
 import { bookOf, reportBooks, TF_INTERVAL, TF_MS } from "../src/forward/books.js";
 import { tradeId } from "../src/forward/paper.js";
-import { confBand, median, mfeIncludingFill, pageMfe, pathMfe, replay, score, targetAudit, VARIANTS, type Leg, type Mode, type Replay, type Variant } from "./exitStudy";
+import { betterProfit, betterRisk, blankRule, chronoSplit, confBand, median, mfeIncludingFill, pageMfe, pathMfe, replay, replayRule, riskScore, score, SWEEP, targetAudit, USD_PER_R, VARIANTS, ruleLabel, type Leg, type Mode, type Replay, type RiskScore, type Rule, type Variant } from "./exitStudy";
 
 const base = process.env.URL || "https://signal-terminal-psi.vercel.app";
 const BOOKS = reportBooks();
@@ -219,4 +219,80 @@ say("");
 say(`Current replay total ${rr(curR)}R on ${cur.length} trades. Stored results ex-funding differ by more than 0.05R on ${replayGap.length} trades.`);
 say(`Strength was matched at placement for ${rows.filter((r) => r.strength !== "Unknown").length} of ${rows.length} closed trades. The rest stay Unknown.`);
 
-await import("node:fs").then((fs) => fs.writeFileSync("/tmp/exit-study.txt", lines.join("\n") + "\n"));
+// Parameter sweep. The setting inside each family is chosen on the first two thirds of that slice by fill time.
+// The last third is not used to pick. Dollars are R times the book's display size, $100 per 1R on every trade.
+type SweepRow = Row & { fillT: number };
+const money = (x: number) => `${x < 0 ? "-" : x > 0 ? "+" : ""}$${Math.abs(Math.round(x)).toLocaleString("en-US")}`;
+const ratioTxt = (x: number) => (!Number.isFinite(x) ? (x > 0 ? "∞" : "-∞") : x.toFixed(2));
+const when = (t: number) => new Date(t).toISOString().slice(0, 16).replace("T", " ") + "Z";
+const playRule = (row: Row, rule: Rule) => replayRule(row.leg, row.candles, rule, "stopFirst");
+const played = (list: SweepRow[], rule: Rule) => {
+  let open = 0;
+  const out: { r: number; exitT: number }[] = [];
+  for (const row of list) {
+    const x = playRule(row, rule);
+    if (x.r == null || x.exitT == null) open++;
+    else out.push({ r: x.r, exitT: x.exitT });
+  }
+  return { open, score: riskScore(out) };
+};
+const lineOf = (label: string, s: RiskScore) =>
+  `${label.padEnd(22)} n=${String(s.n).padStart(3)}${s.early ? "*" : " "}  ${rr(s.totalR).padStart(8)}R  ${money(s.totalUsd).padStart(8)}  DD ${rr(s.maxDdR).padStart(7)}R ${money(s.maxDdUsd).padStart(8)}  worst ${rr(s.worstR).padStart(6)}R  streak ${String(s.loseStreak).padStart(2)}  ratio ${ratioTxt(s.ratio).padStart(6)}`;
+
+say("");
+say(`Parameter sweep. Each family is tuned on the first two thirds of trades by fill time, then checked on the last third. Rank is profit-to-drawdown (total R / |max drawdown|). Dollars use $${USD_PER_R} per 1R, the book's display size, the same on every trade.`);
+say(`Grids, fixed before this run: time ${SWEEP[0].rules.length}, trail ${SWEEP[1].rules.length}, breakeven ${SWEEP[2].rules.length}, partial ${SWEEP[3].rules.length}, target ${SWEEP[4].rules.length}, trail+time ${SWEEP[5].rules.length}.`);
+say("A star means that window has under 30 closed trades.");
+
+const slices: { name: string; pop: SweepRow[] }[] = [
+  { name: "All closed", pop: rows.map((r) => ({ ...r, fillT: r.leg.fillT })) },
+  { name: "15m", pop: rows.filter((r) => r.tf === "15m").map((r) => ({ ...r, fillT: r.leg.fillT })) },
+  { name: "15m Strong", pop: rows.filter((r) => r.tf === "15m" && r.strength === "Strong").map((r) => ({ ...r, fillT: r.leg.fillT })) },
+];
+const report: any[] = [];
+for (const slice of slices) {
+  const { train, test } = chronoSplit(slice.pop);
+  say("");
+  say(`${slice.name}: ${slice.pop.length} trades. Tune ${train.length} (${train.length ? when(train[0].fillT) : "–"} → ${train.length ? when(train[train.length - 1].fillT) : "–"}). Check ${test.length}${test.length < 30 ? ", too early" : ""} (${test.length ? when(test[0].fillT) : "–"} → ${test.length ? when(test[test.length - 1].fillT) : "–"}).`);
+  const families = [{ family: "Current", rules: [blankRule()] }, ...SWEEP];
+  const picked: any[] = [];
+  for (const fam of families) {
+    const trainRuns = fam.rules.map((rule) => ({ rule, ...played(train, rule) }));
+    const opens = trainRuns.reduce((a, x) => a + x.open, 0) + fam.rules.reduce((a, rule) => a + played(test, rule).open, 0);
+    let best = trainRuns[0]; let profit = trainRuns[0];
+    for (const run of trainRuns) {
+      if (betterRisk(run.score, best.score)) best = run;
+      if (betterProfit(run.score, profit.score)) profit = run;
+    }
+    const testScore = played(test, best.rule).score;
+    const fullScore = played(slice.pop, best.rule).score;
+    const profitDiffers = ruleLabel(profit.rule) !== ruleLabel(best.rule);
+    const profitTest = profitDiffers ? played(test, profit.rule).score : null;
+    say(`  ${fam.family} (${fam.rules.length} setting${fam.rules.length === 1 ? "" : "s"})`);
+    say(`    ${lineOf("tune  " + ruleLabel(best.rule), best.score)}`);
+    say(`    ${lineOf("check " + ruleLabel(best.rule), testScore)}`);
+    if (profitDiffers && profitTest) {
+      say(`    profit pick differs: ${ruleLabel(profit.rule)}  tune ${rr(profit.score.totalR)}R ratio ${ratioTxt(profit.score.ratio)}  check ${rr(profitTest.totalR)}R ratio ${ratioTxt(profitTest.ratio)}${profitTest.early ? "  too early" : ""}`);
+    }
+    if (opens) say(`    ${opens} replays were still open at the end of the candles.`);
+    picked.push({
+      family: fam.family, searched: fam.rules.length, setting: ruleLabel(best.rule),
+      train: best.score, test: testScore, full: fullScore,
+      profitPick: profitDiffers && profitTest ? { setting: ruleLabel(profit.rule), train: profit.score, test: profitTest } : null,
+      opens,
+    });
+  }
+  const ranked = [...picked].sort((a, b) => b.test.ratio - a.test.ratio || b.test.totalR - a.test.totalR);
+  say(`  Ranked by the check-set ratio: ${ranked.map((p) => `${p.family} ${ratioTxt(p.test.ratio)}`).join("; ")}.`);
+  report.push({
+    name: slice.name, n: slice.pop.length, trainN: train.length, testN: test.length,
+    trainFrom: train.length ? train[0].fillT : null, trainTo: train.length ? train[train.length - 1].fillT : null,
+    testFrom: test.length ? test[0].fillT : null, testTo: test.length ? test[test.length - 1].fillT : null,
+    families: picked, ranked: ranked.map((p) => p.family),
+  });
+}
+
+await import("node:fs").then((fs) => {
+  fs.writeFileSync("/tmp/exit-study.txt", lines.join("\n") + "\n");
+  fs.writeFileSync("/tmp/exit-sweep.json", JSON.stringify({ usdPerR: USD_PER_R, slices: report }, null, 2));
+});
