@@ -1,5 +1,5 @@
 // Vercel function: public, read-only forward test. Per-scorecard stats (headline first) + trade list, or CSV.
-import { shadowReplay, shadowSummary, unrealR, openWhatIfR, excursion, mergeExc } from "../src/forward/shadow.js";
+import { shadowReplay, shadowSummary, unrealR, openWhatIfR, excursion, mergeExc, shownExc } from "../src/forward/shadow.js";
 import { neon } from "@neondatabase/serverless";
 import { scoreboards, combinedBoard, parseTradeFilters, filterTrades, tradeCounts, tradesCsv, todayByBook, STRATEGY_ID, STRATEGY_NAME, RULES_HASH, MARKETS, reportBooks } from "../src/forward/paper.js";
 import { TF_MS, TF_INTERVAL, bookOf } from "../src/forward/books.js";
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       byM[key] = K; })); } catch { kErr = true; byM = {}; }
     const pack = (t) => byM[`${t.market}|${tfOf(t)}`] ?? [];
     const exc = (t, fillT, exitT) => kErr ? { mfe: null, mae: null } : excursion(t, pack(t), fillT, exitT, exitT == null ? live[`${t.market}|${tfOf(t)}`]?.k : undefined);
-    const T2 = T.map((t) => t.fill_t == null ? t : { ...t, ...mergeExc(t, exc(t, t.fill_t, t.status === "open" ? null : t.exit_t)) });
+    const T2 = T.map((t) => t.fill_t == null ? t : { ...t, ...shownExc(t, mergeExc(t, exc(t, t.fill_t, t.status === "open" ? null : t.exit_t))) });
     let shadow = null;
     if (q.format !== "csv") { if (kErr) shadow = { note: "what-if, not counted", error: "Couldn't load Binance candles for the check right now." }; else {
       const C = T.filter((t) => t.status === "cancelled" && t.exit_t != null);

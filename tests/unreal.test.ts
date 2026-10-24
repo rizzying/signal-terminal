@@ -13,10 +13,20 @@ describe("MFE/MAE (research only)", () => {
   const t = { side: "long", entry: 100, sl: 90 }; const H = 3.6e6;
   const K = [{ t: 0, h: 200, l: 50 }, { t: H, h: 110, l: 95 }, { t: 2 * H, h: 130, l: 70 }];
   it("skips the fill candle, includes exit candle, stops at exit", () => { const e = excursion(t, K, H, 2 * H); expect(e.mfe).toBeCloseTo(1); expect(e.mae).toBeCloseTo(-0.5); });
+  it("clamps the exit-candle wick at the stop, and a fill-candle stop shows the stop", () => {
+    const past = [{ t: 0, h: 150, l: 40 }, { t: H, h: 120, l: 96 }, { t: 2 * H, h: 115, l: 50 }, { t: 3 * H, h: 80, l: 10 }];
+    const held = excursion(t, past, H, 3 * H); // exit candle low 50 is −5R; the candle after exit is ignored
+    expect(held.mfe).toBeCloseTo(2); expect(held.mae).toBeCloseTo(-1);
+    const same = excursion(t, past, H, H); // stopped on the fill candle: window empty, worst is the stop, best stays 0
+    expect(same.mfe).toBe(0); expect(same.mae).toBeCloseTo(-1);
+    const sh = { side: "short", entry: 100, sl: 110, risk: 10 };
+    expect(excursion(sh, [{ t: H, h: 140, l: 95 }], H, 2 * H)).toMatchObject({ mfe: expect.closeTo(0.5), mae: expect.closeTo(-1) });
+    expect(excursion(sh, past, H, H).mae).toBeCloseTo(-1);
+  });
   it("open uses candles to now plus live", () => { const e = excursion(t, K, H, null, 135); expect(e.mfe).toBeCloseTo(3.5); expect(e.mae).toBeCloseTo(-3); });
   it("short + unfilled", () => { expect(excursion({ side: "short", entry: 100, sl: 110 }, K, H, null).mfe).toBeCloseTo(3); expect(excursion(t, K, null, null).mfe).toBeNull(); });
 });
-import { mergeExc } from "../src/forward/shadow.js";
+import { mergeExc, shownExc } from "../src/forward/shadow.js";
 describe("MFE/MAE never shrink (v3.1.7 regression, F-2)", () => {
   // F-2: long 2496.29, SL 2470.24; fill candle 16:00 WIB skipped; closed 17:00/18:00 highs 2507.52; forming 19:00 candle high 2521.42
   const t = { side: "long", entry: 2496.29, sl: 2470.24, risk: 26.05 }; const H = 3.6e6, f0 = 16 * H;
@@ -31,6 +41,12 @@ describe("MFE/MAE never shrink (v3.1.7 regression, F-2)", () => {
   it("ignores a forming candle that duplicates a closed one or predates the fill", () => {
     expect(excursion(t, K, f0 + H, null, { t: f0 + 2 * H, h: 9999, l: 1 }).mfe).toBeCloseTo(0.4311, 3);
     expect(excursion(t, K, f0 + H, null, { t: f0, h: 9999, l: 1 }).mfe).toBeCloseTo(0.4311, 3);
+  });
+  it("a stored wick past the stop displays at the stop, including a fill-candle stop that was stored as 0", () => {
+    const sl = { side: "long", entry: 100, sl: 90, risk: 10, fill_t: 1, exit_t: 5, exit_reason: "sl" };
+    expect(shownExc(sl, mergeExc({ mfe_r: 2.31, mae_r: -2.94 }, { mfe: 2.31, mae: -1 }))).toEqual({ mfe: 2.31, mae: -1 });
+    expect(shownExc({ ...sl, fill_t: 5, exit_t: 5 }, { mfe: 0, mae: 0 })).toEqual({ mfe: 0, mae: -1 });
+    expect(shownExc({ ...sl, exit_t: null, status: "open" }, { mfe: 0.5, mae: -3 })).toEqual({ mfe: 0.5, mae: -3 });
   });
   it("max-merges persisted running values", () => {
     expect(mergeExc({ mfe_r: 0.76, mae_r: -0.5 }, { mfe: 0.43, mae: -0.65 })).toEqual({ mfe: 0.76, mae: -0.65 });
