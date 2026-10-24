@@ -1,7 +1,7 @@
 // Vercel function: public, read-only forward test. Per-scorecard stats (headline first) + trade list, or CSV.
 import { shadowReplay, shadowSummary, unrealR, openWhatIfR, excursion, mergeExc } from "../src/forward/shadow.js";
 import { neon } from "@neondatabase/serverless";
-import { scoreboards, parseTradeFilters, filterTrades, tradeCounts, tradesCsv, todayByBook, STRATEGY_ID, STRATEGY_NAME, RULES_HASH, MARKETS, reportBooks } from "../src/forward/paper.js";
+import { scoreboards, combinedBoard, parseTradeFilters, filterTrades, tradeCounts, tradesCsv, todayByBook, STRATEGY_ID, STRATEGY_NAME, RULES_HASH, MARKETS, reportBooks } from "../src/forward/paper.js";
 import { TF_MS, TF_INTERVAL, bookOf } from "../src/forward/books.js";
 export const config = { maxDuration: 20 };
 const riskParam = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 && n <= 1e7 ? n : 100; };
@@ -22,6 +22,8 @@ export default async function handler(req, res) {
       sql.query(`select strategy, market, t from fwd_events where strategy in (${ph(ids)}) and kind = 'limit' and t > $${ids.length + 1}`, [...ids, Date.now() - 2 * 864e5]),
     ]) : [[], [], [], [], []];
     const boards = scoreboards(T); const headline = boards.find((b) => b.headline) ?? boards[0];
+    const shown = reportBooks().filter((m) => (!f.zone || String(m.zone) === f.zone) && (!f.tf || m.tf === f.tf));
+    const combined = combinedBoard(T, shown);
     const now = Date.now(); const need = new Map();
     for (const t of T) {
       const key = `${t.market}|${tfOf(t)}`;
@@ -55,7 +57,7 @@ export default async function handler(req, res) {
       return res.status(200).send(tradesCsv([...rowsX].sort((a, b) => Number(a.placed_t) - Number(b.placed_t)), riskParam(q.risk)));
     }
     return res.status(200).json({ configured: true, strategy: { id: STRATEGY_ID, name: STRATEGY_NAME, rulesHash: RULES_HASH, markets: MARKETS, tf: "1h", zone: 2, data: "Binance spot" },
-      lastRun: runs[0] ?? null, cursor: cur, score: headline?.score ?? null, scorecards: boards, filters: f, counts: tradeCounts(T, f), total: rowsX.length,
+      lastRun: runs[0] ?? null, cursor: cur, score: headline?.score ?? null, scorecards: boards, combined, filters: f, counts: tradeCounts(T, f), total: rowsX.length,
       trades: rowsX.slice(0, 500).map(withNow), live, events: ev, today: todayByBook(T, lim), shadow, at: Date.now() });
   } catch (e) {
     res.setHeader("Cache-Control", "s-maxage=30");
