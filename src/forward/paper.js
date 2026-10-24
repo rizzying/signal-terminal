@@ -69,6 +69,19 @@ export function scoreboards(trades, metas = reportBooks()) {
     return { id: m.id, name: m.name, tf: m.tf, zone: m.zone, headline: !!m.headline, legacy: !!m.legacy, rulesHash: rows.find((t) => t.rules_hash)?.rules_hash ?? m.rulesHash ?? null, ...scoreboard(rows) };
   });
 }
+/** Display id for the pooled live books. Not a strategy id, so the trader never reads it. */
+export const COMBINED_ID = "all-v2";
+/**
+ * One scorecard for every live book in `metas`, legacy left out.
+ * Counts and total R add across those books. Rates, expectancy, its CI, profit factor and max drawdown are recomputed on the pooled trades (a sum of drawdowns is a different number).
+ */
+export function combinedBoard(trades, metas = reportBooks()) {
+  const live = metas.filter((m) => !m.legacy);
+  const ids = new Set(live.map((m) => m.id));
+  const rows = trades.filter((t) => ids.has(t.strategy));
+  return { id: COMBINED_ID, name: "All zones combined", tf: "", zone: 0, headline: false, legacy: false, combined: true, rulesHash: null,
+    note: "Legacy v1 is not included. It is an older strategy.", ...scoreboard(rows) };
+}
 const H = ["id", "strategy", "rules_hash", "market", "side", "status", "placed_wib", "entry", "sl", "tp", "risk", "replaced", "fill_wib", "exit_wib", "exit_px", "exit_reason", "bars", "r_gross", "cost_r", "funding_r", "funding_src", "r_net", "mfe_r", "mae_r", "risk_usd", "usd_net", "mfe_usd", "mae_usd"];
 const wib = (t) => (t == null ? "" : new Date(Number(t) + 7 * 3.6e6).toISOString().slice(0, 16).replace("T", " "));
 const cell = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };

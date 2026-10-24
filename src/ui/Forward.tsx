@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { parseTradeId, tradeId } from "../forward/paper.js";
+import { COMBINED_ID, parseTradeId, tradeId } from "../forward/paper.js";
 import { bookOf, TF_LABEL } from "../forward/books.js";
 import { SHADOW_LABEL } from "../forward/shadow.js";
 import { TOAST_MS } from "./copySetup";
@@ -137,9 +137,9 @@ export function SignalLog() {
 // ───────── v3.0: the forward test is a virtual trader running one frozen strategy ─────────
 type PT = { mfe?: number | null; mae?: number | null; now?: number; ur?: number | null; id: number; key: string; strategy?: string; market: string; side: "long" | "short"; status: string; placed_t: number; entry: number; sl: number; tp: number; risk: number; replaced: number; fill_t: number | null; exit_t: number | null; exit_px: number | null; exit_reason: string | null; bars: number; cost_r: number | null; funding_r: number | null; funding_src: string | null; r_net: number | null };
 type PScore = { n: number; pending: number; open: number; cancelled: number; expired: number; filled: number; fillRate: number | null; winRate: number | null; expR: number | null; ciLo: number | null; ciHi: number | null; pf: number | null; maxDdR: number; totalR: number; verdict: { key: string; label: string; why: string }; equity: { t: number; r: number }[] };
-type Board = { id: string; name: string; tf: string; zone: number; headline: boolean; legacy: boolean; rulesHash: string | null; n: number; pending: number; open: number; cancelled: number; expired: number; filled: number; fillRate: number | null; tp: number; sl: number; tpRate: number | null; slRate: number | null; avgR: number | null; sample: { closed: number; filled: number; cancelled: number; expired: number; tp: number; sl: number }; score?: PScore };
+type Board = { id: string; name: string; tf: string; zone: number; headline: boolean; legacy: boolean; combined?: boolean; note?: string; rulesHash: string | null; n: number; pending: number; open: number; cancelled: number; expired: number; filled: number; fillRate: number | null; tp: number; sl: number; tpRate: number | null; slRate: number | null; avgR: number | null; sample: { closed: number; filled: number; cancelled: number; expired: number; tp: number; sl: number }; score?: PScore };
 type PData = { configured: boolean; error?: string; strategy?: { id: string; name: string; rulesHash: string; markets: string[] }; lastRun?: { at: string; paper?: string } | null; cursor?: { market: string; last_t: number }[];
-  score?: PScore; scorecards?: Board[]; counts?: Record<string, Record<string, number>>; total?: number; trades?: PT[]; events?: { strategy?: string; market: string; trade_key: string | null; kind: string; t: number; data: any }[]; today?: Record<string, Record<string, { r: number; hit: boolean; limit: number }>>;
+  score?: PScore; scorecards?: Board[]; combined?: Board; counts?: Record<string, Record<string, number>>; total?: number; trades?: PT[]; events?: { strategy?: string; market: string; trade_key: string | null; kind: string; t: number; data: any }[]; today?: Record<string, Record<string, { r: number; hit: boolean; limit: number }>>;
   shadow?: { note: string; error?: string; summary?: { cancelled: number; filled: number; closed: number; netR: number; open: number; pending: number; openR?: { n: number; r: number } }; rows?: Record<string, { status: string; fill_t: number | null; exit_t: number | null; exit_px: number | null; r: number | null; mfe?: number | null; mae?: number | null; now?: number | null; ur?: number | null }> } | null };
 const r2 = (x: number | null, d = 2) => (x == null || !Number.isFinite(x) ? "–" : `${x >= 0 ? "+" : ""}${x.toFixed(d)}`);
 /** Dollars first, R small: "+$59 (0.59R)". */
@@ -173,14 +173,15 @@ export function ForwardView() {
   if (!d.configured || d.error) return <section className="card stack"><h2>Forward test</h2><p className="dim">{d.error ?? "The forward test is being set up."}</p></section>;
   const st = d.strategy!;
   const cards = (d.scorecards ?? []).filter((b) => (!f.zone || String(b.zone) === f.zone) && (!f.tf || b.tf === f.tf));
-  const focusId = cards.some((b) => b.id === focus) ? focus : (cards.find((b) => b.headline)?.id ?? cards[0]?.id ?? st.id);
-  const board = cards.find((b) => b.id === focusId);
+  const focusId = (focus === COMBINED_ID && d.combined) || cards.some((b) => b.id === focus) ? focus : (cards.find((b) => b.headline)?.id ?? cards[0]?.id ?? st.id);
+  const combinedOn = focusId === COMBINED_ID && !!d.combined;
+  const board = combinedOn ? d.combined : cards.find((b) => b.id === focusId);
   const s = board?.score ?? d.score;
   if (!s?.verdict) return <section className="card"><p className="dim">No scorecard yet.</p></section>;
   const live = (d.trades ?? []).filter((t) => (t.status === "pending" || t.status === "open") && (!t.strategy || t.strategy === focusId));
   const tab = f.tab ?? "all"; const rows = (d.trades ?? []).filter((t) => !idNum || String(t.id) === idNum);
   const small = s.n < 30; const V = s.verdict; const day = d.today?.[focusId] ?? {};
-  const evs = (d.events ?? []).filter((e) => !e.strategy || e.strategy === focusId);
+  const evs = (d.events ?? []).filter((e) => combinedOn ? bookOf(e.strategy)?.legacy !== true : (!e.strategy || e.strategy === focusId));
   const mk: [string, string][] = st.markets.map((m) => [m, m.replace(/USDT$/, "")]);
   const hf = (label: string, groups: Group[]) => <HeaderFilter label={label} groups={groups} f={f} counts={d.counts} set={set} />;
   const tradeG: Group[] = [{ key: "market", title: "Market", opts: mk }, { key: "side", title: "Side", opts: [["long", "Long"], ["short", "Short"]] }]; const statG: Group[] = [{ key: "status", title: "Status", opts: Object.entries(PSTAT) }];
@@ -194,7 +195,7 @@ export function ForwardView() {
   return (
     <section className="stack rise forward">
       <div className="card stack">
-        <div className="cardhead"><h2>Forward test · {board?.name ?? st.name}</h2><span className="row gap"><span className={`badge v-${V.key}`} title={V.why}>{V.label}</span><a className="btn sm" href={`/api/paper?${[`format=csv`, `risk=${risk}`, q, idNum ? `id=${idNum}` : ""].filter(Boolean).join("&")}`} download>Export CSV</a></span></div>
+        <div className="cardhead"><h2>Forward test · {board?.name ?? st.name}</h2><span className="row gap">{combinedOn ? <span className="badge" title="Display only. Each scorecard keeps its own verdict.">Combined</span> : <span className={`badge v-${V.key}`} title={V.why}>{V.label}</span>}<a className="btn sm" href={`/api/paper?${[`format=csv`, `risk=${risk}`, q, idNum ? `id=${idNum}` : ""].filter(Boolean).join("&")}`} download>Export CSV</a></span></div>
         <p className="small">Nine paper scorecards on Binance <b>spot</b> (<b>{mk.map((m) => m[1]).join(", ")}</b>): zones 1–3 × 15m, 1H and 4H. Each has its own virtual trader, one order or position per coin. The headline is <b>1H Zone 2</b>. A resting order stays at its price until it fills or expires (24 candles of that timeframe). The next order for that coin waits until this one has closed or expired. All out at <b>3R</b> (+${usd(3, risk).slice(2)} at ${risk} risk per trade, set in Settings › Labs).</p>
         <p className="dim small">Fills need price to trade <i>through</i> the entry by max(1 tick, 0.02%). Costs: Binance futures maker 0.02% / taker 0.05%, 0.02% spread and 0.05% slippage on stops, plus funding. Stop and target in one candle = stop. Headline hash <code>{st.rulesHash}</code> · <a href={SPEC_URL} target="_blank" rel="noreferrer">spec</a> · {st.id}{d.lastRun && <> · last run {wib(d.lastRun.at)}</>}</p>
         <div className="ffilters">
@@ -203,21 +204,22 @@ export function ForwardView() {
           {(f.zone || f.tf) && <button className="btn ghost sm" onClick={() => setF((x) => ({ ...x, zone: undefined, tf: undefined }))}>Clear zone / TF</button>}
         </div>
         <div className="pbars"><Bar n={s.n} of={30} label={`${board?.name ?? st.name}: first read (30 closed trades)`} /><Bar n={s.n} of={100} label={`${board?.name ?? st.name}: decision (100 closed trades)`} /></div>
-        <p className="small"><b>{V.label}:</b> {V.why}. Kill and promote are judged per scorecard, three coins pooled, never across zones or timeframes. Daily limit: each scorecard pauses a coin that loses {usd(-3, risk).slice(1)} (3R) in a WIB day. Open positions run on.</p>
+        <p className="small">{combinedOn ? <>These numbers pool the live scorecards on screen. Kill and promote stay on each scorecard, never across zones or timeframes.</> : <><b>{V.label}:</b> {V.why}. Kill and promote are judged per scorecard, three coins pooled, never across zones or timeframes. Daily limit: each scorecard pauses a coin that loses {usd(-3, risk).slice(1)} (3R) in a WIB day. Open positions run on.</>}</p>
       </div>
-      <div className="books" role="list">{cards.map((b) => <button key={b.id} type="button" role="listitem" data-scorecard={b.id} className={`card book ${b.headline ? "headline" : ""} ${b.legacy ? "legacy" : ""} ${b.id === focusId ? "on" : ""}`} aria-pressed={b.id === focusId} onClick={() => setFocus(b.id)}>
-        <span className="lbl">{b.headline ? "Headline" : b.legacy ? "Legacy v1" : "Scorecard"} · {TF_LABEL[b.tf as keyof typeof TF_LABEL] ?? b.tf} · Z{b.zone}</span>
+      <div className="books" role="list">{[...(d.combined ? [d.combined] : []), ...cards].map((b) => <button key={b.id} type="button" role="listitem" data-scorecard={b.id} className={["card", "book", b.headline && "headline", b.legacy && "legacy", b.id === focusId && "on"].filter(Boolean).join(" ")} aria-pressed={b.id === focusId} onClick={() => setFocus(b.id)}>
+        <span className="lbl">{b.combined ? "All zones" : b.headline ? "Headline" : b.legacy ? "Legacy v1" : "Scorecard"}{b.combined ? "" : ` · ${TF_LABEL[b.tf as keyof typeof TF_LABEL] ?? b.tf} · Z${b.zone}`}</span>
         <b className="name">{b.name}</b>
         <span className="mono">Closed {b.sample.closed}{b.n > 0 && b.n < 30 ? " · small sample" : ""}</span>
         <span className="mono dim">Fill {rateOf(b.sample.filled, b.sample.filled + b.sample.cancelled + b.sample.expired, b.fillRate)}</span>
         <span className="mono dim">TP {rateOf(b.tp, b.sample.closed, b.tpRate)} · SL {rateOf(b.sl, b.sample.closed, b.slRate)}</span>
         <span className="mono">Avg <M r={b.avgR} risk={risk} /></span>
       </button>)}</div>
+      {d.combined && <p className="dim small">{d.combined.note}</p>}
       <div className="statrow">{stats.map(([k, v, sub]) => <div key={k} className="card stat"><span className="lbl">{k}</span><b className="mono">{v}</b>{sub && <span className="dim small">{sub}</span>}{small && k !== "Closed trades" && s.n > 0 && <span className="badge">small sample</span>}</div>)}</div>
       <div className="fgrid">
         <div className="card"><h3>Equity · {board?.name ?? st.name}</h3><Equity pts={s.equity} /></div>
-        <div className="card"><h3>Now · {board?.name ?? st.name}</h3>{st.markets.map((m) => { const t = live.find((x) => x.market === m); const td = day[m]; return <div key={m} className="row between nowrow"><b>{m.replace(/USDT$/, "")} <span className={`mono small ${td && td.r < 0 ? "neg" : td && td.r > 0 ? "pos" : "dim"}`} title="Realized P&L today (WIB), this scorecard only">today <M r={td?.r ?? 0} risk={risk} /> <span className="dim">· limit {usd(td?.limit ?? -3, risk)}</span></span>{td?.hit && <span className="badge v-kill" title={`Lost ${usd(3, risk).slice(1)} (3R) today on this scorecard: no new orders until 00:00 WIB`}>daily limit hit</span>}</b>{t ? <span className="small">{t.status === "open" ? "Position" : "Limit order"} <span className={`badge ${t.side}`}>{t.side}</span> @ <b className="mono">{fmt(t.entry)}</b> · SL <span className="neg mono">{fmt(t.sl)}</span> · TP <span className="pos mono">{fmt(t.tp)}</span>{t.replaced ? ` · moved ${t.replaced}×` : ""}</span> : <span className="dim small">{td?.hit ? "paused until 00:00 WIB" : "flat"}</span>}</div>; })}
-          {!!evs.length && <><h4 className="lbl">Latest events</h4><ul className="evlist small">{evs.slice(0, 8).map((e, i) => <li key={i}><span className="dim">{wib(Number(e.t))}</span> {e.market.replace(/USDT$/, "")} <b>{e.kind === "limit" ? "daily limit hit" : e.kind}</b>{e.kind === "replace" ? ` → ${fmt(e.data?.to?.entry)}` : e.kind === "place" ? ` ${e.data?.side} @ ${fmt(e.data?.entry)}` : e.kind === "close" ? <> {e.data?.reason} <M r={e.data?.r_net == null ? null : +e.data.r_net} risk={risk} /></> : ""}</li>)}</ul></>}</div>
+        <div className="card"><h3>Now · {board?.name ?? st.name}</h3>{combinedOn ? <p className="small">Open orders and the daily pause stay on each scorecard.</p> : st.markets.map((m) => { const t = live.find((x) => x.market === m); const td = day[m]; return <div key={m} className="row between nowrow"><b>{m.replace(/USDT$/, "")} <span className={`mono small ${td && td.r < 0 ? "neg" : td && td.r > 0 ? "pos" : "dim"}`} title="Realized P&L today (WIB), this scorecard only">today <M r={td?.r ?? 0} risk={risk} /> <span className="dim">· limit {usd(td?.limit ?? -3, risk)}</span></span>{td?.hit && <span className="badge v-kill" title={`Lost ${usd(3, risk).slice(1)} (3R) today on this scorecard: no new orders until 00:00 WIB`}>daily limit hit</span>}</b>{t ? <span className="small">{t.status === "open" ? "Position" : "Limit order"} <span className={`badge ${t.side}`}>{t.side}</span> @ <b className="mono">{fmt(t.entry)}</b> · SL <span className="neg mono">{fmt(t.sl)}</span> · TP <span className="pos mono">{fmt(t.tp)}</span>{t.replaced ? ` · moved ${t.replaced}×` : ""}</span> : <span className="dim small">{td?.hit ? "paused until 00:00 WIB" : "flat"}</span>}</div>; })}
+          {!!evs.length && <><h4 className="lbl">Latest events</h4><ul className="evlist small">{evs.slice(0, 8).map((e, i) => { const bk = bookOf(e.strategy); return <li key={i}><span className="dim">{wib(Number(e.t))}</span> {e.market.replace(/USDT$/, "")} {combinedOn && bk ? <span className="dim">{TF_LABEL[bk.tf as keyof typeof TF_LABEL]} Z{bk.zone} </span> : null}<b>{e.kind === "limit" ? "daily limit hit" : e.kind}</b>{e.kind === "replace" ? ` → ${fmt(e.data?.to?.entry)}` : e.kind === "place" ? ` ${e.data?.side} @ ${fmt(e.data?.entry)}` : e.kind === "close" ? <> {e.data?.reason} <M r={e.data?.r_net == null ? null : +e.data.r_net} risk={risk} /></> : ""}</li>; })}</ul></>}</div>
       </div>
       <div className="seg ftabs" role="tablist" aria-label="Trades">{[["filled", "Filled"], ["notfilled", "Not filled"], ["cancelled", "Cancelled"], ["expired", "Expired"], ["all", "All"]].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => set("tab", k === "all" ? "" : k)}>{l} <span className="mono dim">{d.counts?.tab?.[k] ?? 0}</span></button>)}</div>
       {d.shadow && <div className="card whatif-card"><div className="row gap wrap"><b>Cancelled order check</b><span className="badge">what-if, not counted</span>

@@ -5,7 +5,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { step, settle, tradesThrough, buffer, rulesHash, SPEC, STRATEGY, LEGACY_SPEC, BOOKS, type State, type Plan, type Trade } from "../src/forward/trader";
 import { BOOK_HASH } from "../src/forward/books.js";
 import { paperJob } from "../src/forward/paperJob";
-import { meanCI, maxDdR, scorecard, scoreboards, verdict, tCrit, filterTrades, tradeCounts, parseTradeFilters, tradesCsv, today, parseTradeId, tradeId } from "../src/forward/paper.js";
+import { meanCI, maxDdR, scorecard, scoreboards, combinedBoard, COMBINED_ID, verdict, tCrit, filterTrades, tradeCounts, parseTradeFilters, tradesCsv, today, parseTradeId, tradeId } from "../src/forward/paper.js";
 import { wibDay } from "../src/forward/trader";
 import { wibRange, type Stmt } from "../src/forward/paperJob";
 const H = 3.6e6, M = "BTCUSDT";
@@ -106,6 +106,38 @@ it("paper.js constants match the trader", async () => { const p = await import("
   expect(boards.map((b) => b.id)[0]).toBe("bn-1h-z2-v2"); expect(boards.at(-1)!.id).toBe("bn-1h-z2-v1"); expect(boards.at(-1)!.legacy).toBe(true); expect(boards).toHaveLength(10);
   expect(boards[0]).toMatchObject({ n: 1, avgR: 1, headline: true }); expect(boards.find((b) => b.id === "bn-15m-z1-v2")).toMatchObject({ n: 1, avgR: -1, tp: 0, sl: 1 });
   expect(boards.at(-1)).toMatchObject({ n: 1, sample: { closed: 1, expired: 1 } });
+  const pool = combinedBoard([{ strategy: "bn-1h-z2-v2", status: "closed", exit_reason: "tp", r_net: 1, exit_t: 1 }, { strategy: "bn-15m-z1-v2", status: "closed", exit_reason: "sl", r_net: -1, exit_t: 2 }, { strategy: "bn-1h-z2-v1", status: "closed", exit_reason: "tp", r_net: 2, exit_t: 4 }, { strategy: "bn-1h-z2-v1", status: "expired" }]);
+  expect(pool.id).toBe(COMBINED_ID); expect(pool.combined).toBe(true); expect(pool.legacy).toBe(false);
+  expect(pool.n).toBe(2); expect(pool.tp).toBe(1); expect(pool.sl).toBe(1); expect(pool.score.totalR).toBe(0); expect(pool.sample.expired).toBe(0);
+  expect(pool.note).toMatch(/Legacy v1/);
+  expect(boards[0].n).toBe(1); expect(boards.at(-1)!.n).toBe(1);
+});
+it("the combined card adds the live books and recomputes drawdown", () => {
+  const trades = [
+    { strategy: "bn-1h-z2-v2", status: "closed", exit_reason: "tp", r_net: 5, exit_t: 1 },
+    { strategy: "bn-1h-z2-v2", status: "closed", exit_reason: "sl", r_net: -1, exit_t: 4 },
+    { strategy: "bn-15m-z1-v2", status: "closed", exit_reason: "sl", r_net: -4, exit_t: 2 },
+    { strategy: "bn-15m-z1-v2", status: "pending", r_net: null, exit_t: null },
+    { strategy: "bn-15m-z1-v2", status: "open", r_net: null, exit_t: null },
+    { strategy: "bn-4h-z3-v2", status: "cancelled", r_net: null },
+    { strategy: "bn-1h-z2-v1", status: "closed", exit_reason: "tp", r_net: 9, exit_t: 3 },
+    { strategy: "bn-1h-z1-v2", status: "closed", exit_reason: "tp", r_net: 3, exit_t: 3 },
+  ];
+  const boards = scoreboards(trades);
+  const live = boards.filter((b) => !b.legacy);
+  const pool = combinedBoard(trades);
+  const sum = (k: "n" | "pending" | "open" | "cancelled" | "expired" | "filled" | "tp" | "sl") => live.reduce((a, b) => a + b[k], 0);
+  for (const k of ["n", "pending", "open", "cancelled", "expired", "filled", "tp", "sl"] as const) expect(pool[k]).toBe(sum(k));
+  expect(pool.score.totalR).toBeCloseTo(live.reduce((a, b) => a + b.score.totalR, 0));
+  expect(pool.n).toBe(4); expect(pool.tp).toBe(2); expect(pool.sl).toBe(2); expect(pool.pending).toBe(1); expect(pool.open).toBe(1); expect(pool.cancelled).toBe(1);
+  expect(pool.fillRate).toBeCloseTo(5 / 6);
+  expect(pool.avgR).toBeCloseTo((5 - 1 - 4 + 3) / 4);
+  expect(pool.score.maxDdR).toBeCloseTo(-4);
+  expect(live.reduce((a, b) => a + b.score.maxDdR, 0)).not.toBeCloseTo(pool.score.maxDdR);
+  const only15 = combinedBoard(trades, [{ id: "bn-15m-z1-v2", legacy: false }, { id: "bn-1h-z2-v1", legacy: true }]);
+  expect(only15.n).toBe(1); expect(only15.sl).toBe(1); expect(only15.pending).toBe(1);
+  expect(boards.find((b) => b.id === "bn-1h-z2-v2")!.n).toBe(2);
+  expect(boards.find((b) => b.legacy)!.score.totalR).toBe(9);
 });
 const RULES = () => rulesHash();
 it("daily loss limit: −3R realized in a WIB day cancels the pending order, blocks new ones, keeps the open position, resumes next WIB day", () => {
