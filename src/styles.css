@@ -140,7 +140,7 @@ code{font-family:var(--mono);font-size:12px}
 @media (max-width:63.99rem){.zones{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr 1fr}}
 @media (max-width:47.99rem){
   .app{padding:16px 16px calc(96px + env(safe-area-inset-bottom))}
-  .top{margin-bottom:16px}
+  .top{position:static;top:auto;margin-bottom:16px;padding:0;background:transparent;backdrop-filter:none;box-shadow:none}
   .card{padding:16px}
   .stack{gap:16px}
   .nav{position:fixed;left:12px;right:12px;transform:none;bottom:calc(12px + env(safe-area-inset-bottom));z-index:50;background:rgba(24,24,24,.92);backdrop-filter:blur(16px);box-shadow:var(--ring);margin:0;padding:4px;border-radius:16px;justify-content:space-between;flex-wrap:nowrap}
