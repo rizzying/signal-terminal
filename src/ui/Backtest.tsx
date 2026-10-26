@@ -94,7 +94,7 @@ function Results({ res, theme, margin }: { res: { r: BtResult; mag: MagStats | n
   const { r, c } = res; const eqEl = useRef<HTMLDivElement>(null); const pxEl = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const charts: IChartApi[] = []; const ink2 = css("--ink-2"), line = css("--line-soft"), acc = css("--chart"), ink3 = css("--ink-3"), pos = css("--pos"), neg = css("--neg");
-    const opts = { autoSize: true, layout: { background: { color: "transparent" }, textColor: ink2, fontFamily: "Inter Variable, Inter, system-ui, sans-serif", fontSize: 11 }, grid: { vertLines: { color: line }, horzLines: { color: line } }, rightPriceScale: { borderVisible: false }, timeScale: { borderVisible: false, timeVisible: true } };
+    const opts = { autoSize: true, layout: { background: { color: "transparent" }, textColor: ink2, fontFamily: "Geist Mono Variable, Geist Mono, ui-monospace, monospace", fontSize: 12 }, grid: { vertLines: { color: line }, horzLines: { color: line } }, rightPriceScale: { borderVisible: false }, timeScale: { borderVisible: false, timeVisible: true } };
     const T = (t: number) => (t / 1000) as Time;
     const mk = (side: "in" | "out"): SeriesMarker<Time>[] => r.trades.flatMap((t) => side === "in"
       ? [{ time: T(t.entryT), position: t.dir === "long" ? "belowBar" : "aboveBar", color: t.dir === "long" ? pos : neg, shape: t.dir === "long" ? "arrowUp" : "arrowDown", text: t.dir === "long" ? "L" : "S" } as SeriesMarker<Time>]
@@ -150,7 +150,7 @@ function MonteCarloCard({ r, theme }: { r: BtResult; theme: string }) {
   const mc = r.mc; const el = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!mc || !el.current || mc.n < 2) return; const acc = css("--chart"), ink3 = css("--ink-3"), ink2 = css("--ink-2"), line = css("--line-soft");
-    const ch = createChart(el.current, { autoSize: true, handleScroll: false, handleScale: false, layout: { background: { color: "transparent" }, textColor: ink2, fontFamily: "Inter Variable, Inter, system-ui, sans-serif", fontSize: 11 }, grid: { vertLines: { visible: false }, horzLines: { color: line } }, rightPriceScale: { borderVisible: false }, timeScale: { borderVisible: false, visible: false }, crosshair: { vertLine: { visible: false }, horzLine: { visible: false } } });
+    const ch = createChart(el.current, { autoSize: true, handleScroll: false, handleScale: false, layout: { background: { color: "transparent" }, textColor: ink2, fontFamily: "Geist Mono Variable, Geist Mono, ui-monospace, monospace", fontSize: 12 }, grid: { vertLines: { visible: false }, horzLines: { color: line } }, rightPriceScale: { borderVisible: false }, timeScale: { borderVisible: false, visible: false }, crosshair: { vertLine: { visible: false }, horzLine: { visible: false } } });
     const T = (j: number) => (j + 1) as Time; const mk = (d: number[], color: string, w: 1 | 2, style = 0) => ch.addLineSeries({ color, lineWidth: w, lineStyle: style, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false }).setData(d.map((v, j) => ({ time: T(j), value: v })));
     mk(mc.fan.p95, ink3, 1, 2); mk(mc.fan.p5, ink3, 1, 2); mk(mc.fan.p50, acc, 2); ch.timeScale().fitContent(); return () => ch.remove();
   }, [mc, theme]);

@@ -35,7 +35,7 @@ export function Chart({ onPickPrice, candles, analysis, setup, zone, theme, view
   }, [theme, ready]);
   function applyTheme() {
     const c = chart.current; if (!c) return; const ink2 = css("--ink-2"), line = css("--line-soft"), pos = css("--pos"), neg = css("--neg");
-    c.applyOptions({ layout: { background: { color: "transparent" }, textColor: ink2, fontFamily: "Inter Variable, Inter, system-ui, sans-serif", fontSize: 11 }, grid: { vertLines: { color: line }, horzLines: { color: line } } }); if (el.current) el.current.dataset.grid = line;
+    c.applyOptions({ layout: { background: { color: "transparent" }, textColor: ink2, fontFamily: "Geist Mono Variable, Geist Mono, ui-monospace, monospace", fontSize: 12 }, grid: { vertLines: { color: line }, horzLines: { color: line } } }); if (el.current) el.current.dataset.grid = line;
     series.current?.applyOptions({ upColor: pos, downColor: neg, wickUpColor: pos, wickDownColor: neg });
     drawLines();
   }

@@ -71,7 +71,7 @@ export function TodayView({ settings, go, onScan }: { settings: Settings; go: (t
         <div className="tile-foot small">{!alerts.length ? <span className="dim">No alerts. Set one from a zone on Scan.</span> : <AlertList alerts={alerts} />}</div>
       </Tile>
       <Tile title="Next event" go={() => go("calendar")} label="Calendar">
-        {ev === undefined ? <p className="dim" role="status">Loading…</p> : ev === "err" || ev === null ? <p className="dim">{ev === null ? "No more high-impact US events this month." : "Calendar unavailable right now."}</p> :
+        {ev === undefined ? <p className="skel" role="status">Loading…</p> : ev === "err" || ev === null ? <p className="dim">{ev === null ? "No more high-impact US events this month." : "Calendar unavailable right now."}</p> :
           <><p className="big mono" aria-live="off">{countdown(ev.time - now)}</p><p className="dim small">{wib(ev.time)} WIB{ev.events.length > 1 ? ` · ${ev.events.length} releases` : ""}</p>
           {(() => { const e = ev.events.find((x) => x.polymarket) ?? ev.events[0]; return <div className="evx"><p className="small"><b>{e.title}</b>{ev.events.length > 1 && <span className="dim"> +{ev.events.length - 1} more</span>}</p>
             {e.forecast == null && e.previous == null ? <p className="dim small">No forecast or previous value yet.</p> :
@@ -80,7 +80,7 @@ export function TodayView({ settings, go, onScan }: { settings: Settings; go: (t
       </Tile>
       <Tile title="Market pulse" go={() => go("scan")} label="Scan">
         <p className="dim small">Hyperliquid · 24h change · funding per hour</p>
-        {pulse === null ? <p className="dim" role="status">Loading…</p> : pulse === "err" ? <p className="dim">Prices unavailable right now.</p> :
+        {pulse === null ? <p className="skel" role="status">Loading…</p> : pulse === "err" ? <p className="dim">Prices unavailable right now.</p> :
           <ul className="pulse">{pulse.map((p) => <li key={p.coin}><b>{p.coin}</b><span className="mono">{fmt(p.px)}</span><span className={`mono ${p.chg >= 0 ? "pos" : "neg"}`}>{pct(p.chg)}</span><span className="mono dim">{(p.funding * 100).toFixed(4)}%</span></li>)}</ul>}
       </Tile>
       </div>

@@ -24,9 +24,9 @@ export function PositioningPanel({ symbol, oi }: { symbol: string; oi: OIPoint[]
           <div className="lsbar" aria-hidden="true"><div style={{ width: `${x.longPct * 100}%` }} /></div><span className="mono small dim">{Math.round(x.longPct * 100)}% long{x.prev ? ` · was ${x.prev.toFixed(2)}` : ""}</span></div>)}
         {ls && !ls.length && <div className="stat dim small">Long/short ratio not available for {base}.</div>}
       </div>
-      <h3 className="lbl" style={{ marginTop: 20 }}>Recent liquidations (Gate + OKX)</h3>
+      <h3 className="lbl" style={{ marginTop: 24 }}>Recent liquidations (Gate + OKX)</h3>
       {lq && <p className="mono small">Longs liquidated {usd(longUsd)} · shorts liquidated {usd(shortUsd)}{lq.failed.length ? <span className="dim"> · unavailable: {lq.failed.join(", ")}</span> : null}</p>}
-      {lq?.liqs.length ? <ul className="liqs">{lq.liqs.slice(0, 12).map((l, i) => <li key={i}><span className="mono dim">{time(l.t)}</span><span className={`badge ${l.side}`}>{l.side}</span><span className="mono">{fmt(l.px)}</span><span className="mono">{usd(l.usd)}</span><span className="dim small">{l.venue}</span></li>)}</ul> : <p className="dim small">{lq ? "No recent liquidations." : "Loading…"}</p>}
+      {lq?.liqs.length ? <ul className="liqs">{lq.liqs.slice(0, 12).map((l, i) => <li key={i}><span className="mono dim">{time(l.t)}</span><span className={`badge ${l.side}`}>{l.side}</span><span className="mono">{fmt(l.px)}</span><span className="mono">{usd(l.usd)}</span><span className="dim small">{l.venue}</span></li>)}</ul> : lq ? <p className="dim small">No recent liquidations.</p> : <p className="skel" role="status">Loading…</p>}
       <p className="dim small">“Long liquidated” = a long position was force-closed. Times in WIB. OI and ratios are from single exchanges, not the whole market.</p>
     </div>
   );

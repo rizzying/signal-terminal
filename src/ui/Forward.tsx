@@ -96,7 +96,7 @@ export function SignalLog() {
   useEffect(() => { poll(); }, [waiting]);
   useVisibleInterval(() => { poll(); }, 15_000, [waiting]);
   if (err) return <section className="card"><p className="alert">{err}</p></section>;
-  if (!d) return <section className="card"><p className="dim" role="status">Loading…</p></section>;
+  if (!d) return <section className="card"><p className="skel" role="status">Loading…</p></section>;
   if (!d.configured || d.error) return <section className="card stack"><h2>Forward test</h2><p className="dim">{d.error ?? "The forward test is being set up. Results will appear here after the first hourly run."}</p></section>;
   const s = d.score!; const set = (k: keyof Filters, v: string) => setF((x) => ({ ...x, [k]: v || undefined }));
   const sel = (k: keyof Filters, label: string, opts: [string, string][]) => { const multi = f[k]?.includes(",");
@@ -169,7 +169,7 @@ export function ForwardView() {
   useEffect(() => { let live = true; setErr(""); fetch(`/api/paper?${q}`).then((r) => r.json()).then((x) => live && setD(x)).catch(() => live && setErr("Couldn't load the forward test right now.")); return () => { live = false; }; }, [q]);
   const set = (k: string, v: string) => setF((x) => ({ ...x, [k]: v || undefined }));
   if (err) return <section className="card"><p className="alert">{err}</p></section>;
-  if (!d) return <section className="card"><p className="dim" role="status">Loading…</p></section>;
+  if (!d) return <section className="card"><p className="skel" role="status">Loading…</p></section>;
   if (!d.configured || d.error) return <section className="card stack"><h2>Forward test</h2><p className="dim">{d.error ?? "The forward test is being set up."}</p></section>;
   const st = d.strategy!;
   const cards = (d.scorecards ?? []).filter((b) => (!f.zone || String(b.zone) === f.zone) && (!f.tf || b.tf === f.tf));
@@ -226,7 +226,7 @@ export function ForwardView() {
         {d.shadow.error ? <span className="dim small">{d.shadow.error}</span> : d.shadow.summary && <span className="small">Cancelled <b className="mono">{d.shadow.summary.cancelled}</b> · would have filled <b className="mono">{d.shadow.summary.filled}</b>{d.shadow.summary.open ? ` (${d.shadow.summary.open} still open)` : ""} · net what-if <b className={`mono ${d.shadow.summary.netR >= 0 ? "pos" : "neg"}`}><M r={d.shadow.summary.netR} risk={risk} /></b> <span className="dim">over {d.shadow.summary.closed} closed</span>{!!d.shadow.summary.openR?.n && <> · open what-if <b className={`mono ${d.shadow.summary.openR.r >= 0 ? "pos" : "neg"}`}><M r={d.shadow.summary.openR.r} risk={risk} /></b> <span className="dim">(unrealized)</span></>}</span>}</div>
         <p className="dim small">Replays each cancelled order with its last entry, stop and target on that scorecard's candles after the cancel, with the same fill and cost rules and 24-bar expiry from placement (funding left out). Research only: it doesn't change the score, the daily limit or the strategy.</p></div>}
       <div className="card">
-        <div className="row gap wrap idsearch"><label className="lbl" htmlFor="fid">Find ID</label><input id="fid" className="mono" type="search" inputMode="text" placeholder="e.g. F-12" value={idq} onChange={(e) => setIdq(e.target.value)} aria-label="Find trade by ID" style={{ width: "9em" }} />{idq && !idNum && <span className="dim small">type a number like 12 or F-12</span>}</div>
+        <div className="row gap wrap idsearch"><label className="lbl" htmlFor="fid">Find ID</label><input id="fid" className="mono input" type="search" inputMode="text" placeholder="e.g. F-12" value={idq} onChange={(e) => setIdq(e.target.value)} aria-label="Find trade by ID" />{idq && !idNum && <span className="dim small">type a number like 12 or F-12</span>}</div>
         <div className="zfilters-m row gap wrap"><span className="lbl">Filter</span>{hf("Trade", tradeG)}{hf("Status", statG)}</div>
         {idNum && !rows.length ? <p className="note">No trade F-{idNum} in this view. Try the All tab or clear filters.</p> : !rows.length ? <p className="note">No trades in this view yet. Orders appear after the next hourly run when a setup shows on that scorecard.</p> :
         <table className="rt ztable"><thead><tr><th>ID</th><th>Placed</th><th>{hf("Trade", tradeG)}</th><th>Entry</th><th>Stop</th><th>TP (3R)</th><th>Filled</th><th>Closed</th><th>{hf("Status", statG)}</th><th>Result</th><th title="What-if replay of cancelled orders. Not counted.">What-if</th></tr></thead>
