@@ -64,7 +64,7 @@ export function Watchlist({ settings, onOpen }: { settings: Settings; onOpen: (e
         <label className="lbl" htmlFor="wl">Symbols (comma separated, exchange format)</label>
         <textarea id="wl" className="input" style={{ width: "100%", marginTop: 4 }} rows={2} value={list} onChange={(e) => setList(e.target.value)} />
         <div className="row gap" style={{ marginTop: 12 }}><button className="btn primary" disabled={!!prog} onClick={run}>{prog ? `Scanning ${prog}…` : "Scan watchlist"}</button><span className="dim small">Ranks by: setup rule met, then confidence, then best R:R.</span></div>
-        <div className="row gap wrap" style={{ marginTop: 10 }}><label className="lbl" htmlFor="wl-every">Auto-refresh</label>
+        <div className="row gap wrap" style={{ marginTop: 8 }}><label className="lbl" htmlFor="wl-every">Auto-refresh</label>
           <select id="wl-every" className="input" value={every} onChange={(e) => { const v = +e.target.value; setEvery(v); localStorage.setItem("sig.watch.every", String(v)); }}>{EVERY.map((m) => <option key={m} value={m}>{m ? `Every ${m} min` : "Off"}</option>)}</select>
           <span className="dim small">{every ? "Runs while this tab is open and visible, after your first scan." : "Manual only."}{at ? ` Last scan ${new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}.` : ""}</span></div>
       </div>

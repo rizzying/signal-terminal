@@ -1,61 +1,55 @@
-# Design note (v3.6.0)
+# Design note
 
-Visual only. Scans, the forward test, stored data, numbers, and the meaning of the copy stay as they are. The confidence line stays: "Low, Med or High is a weighted score of how strongly the signals agree. It is not a win chance."
+Visual only. Pages, copy, controls, and every number stay as they are. The confidence line stays: "Low, Med or High is a weighted score of how strongly the signals agree. It is not a win chance." The forward test, its recording job, and the calculations are untouched.
 
-The look replaces the Auros dark teal stack. The source for the tokens is the attached Glassnode design system: a light research canvas, white cards, black buttons, and dark bands only where a page is built from alternating sections.
+This replaces the Glassnode light system (cloud canvas, white cards, Inter, blue wash). It does not bring back the earlier dark teal terminal.
 
 ## References
 
 Looked at before the CSS change. Nothing was copied: no logos, no images, no sentences.
 
-1. **Glassnode**, the attached style reference, and the live studio at [studio.glassnode.com](https://studio.glassnode.com/). The studio is a dense asset table on a light page (`theme-color` `#000000`). Used here: cloud `#edeff2` as the canvas, white cards with a 1px `#dedfe1` hairline, 2px corners, black filled buttons, ghost buttons, Inter, and `#e2e7fc` as the only wash. The chart line on the hero widget is `#4a6cf7` over that wash, which is the line color the spec names.
+1. [SaaSFrame on Designeer](https://designeer.xyz/inspiration/saasframe) ([saasframe.io](https://www.saasframe.io/)). Product screens sit in a quiet frame: a short header, then metric blocks, then the working table. Used here for the order of a page. Scorecards first, the trade table after, one filled action.
+2. [Screenlane on Designeer](https://designeer.xyz/inspiration/screenlane) ([screenlane.com](https://screenlane.com/)). App screens keep a persistent nav and let the table be the work surface. Used here for the terminal: the same tabs, a content width that stops stretching on a very wide monitor, phone nav parked at the bottom.
+3. [Dark Mode Design on Designeer](https://designeer.xyz/inspiration/dark-mode-design) ([darkmodedesign.com](https://www.darkmodedesign.com/)) and [Sombra](https://designeer.xyz/inspiration/sombra) ([sombra.design](https://sombra.design/)). Dark interfaces built from stepped neutrals, not a neon accent on pure black. [Details](https://designeer.xyz/inspiration/details) ([details.so](https://www.details.so/)) for the small motions: press, focus, and a menu that arrives instead of popping.
 
-2. **Messari**, requested at [messari.io](https://messari.io/), which redirected to [Blockworks Intel](https://app.blockworks.com/?from=messari). The page is price and research tables (`theme-color` `#1a1a1a`). Used here: one dark band color, `#1a1a1a`, for the landing sections and the footer, with fog `#a0a0a0` for the reading text on that ground.
-
-3. **Koyfin**, the marketing page at [koyfin.com](https://www.koyfin.com/). A light page: headline, short description, two actions, then feature sections. Used here: the landing order. A two-column hero (words and actions on the left, a chart card on the right), then a dark band, a light card grid, a dark close, and a dark footer.
-
-## Light and dark
-
-The theme toggle does not return. In this spec, dark is a band color on the landing (`#1a1a1a`), not a second theme for the terminal. Today, Scan, Market, Watchlist, Forward test, Backtest, Calendar, Wallets, Journal, and Settings all sit on the same light canvas.
-
-`:root` and `.dark` share one token block, including `--bg:#edeff2`. A stored `sig.theme=light` that strips the `dark` class, or a stored dark preference that leaves it, cannot change a color. The inline script in `index.html` and `welcome.html` is unchanged, so the content-security-policy hash `sha256-j2RV/yS2KqN55+n381ZvyAMRj+yYXrSW4paJpk4kO0k=` still matches. React still adds `dark` and sets the theme color to `#edeff2`.
+Refactoring UI, applied inside the skill limits: hierarchy from size and weight, space before rules, one gray family, green and red only where a long and a short have to be told apart.
 
 ## Layout
 
-- The terminal stays full-bleed. Gutters stay 24px on a wide screen and 12px on a phone. Cards are white, 16px padding, 2px corners, and a 1px hairline. The bottom nav on a phone is a white surface with a 2px corner and a hairline.
-- Desktop (1440): Scan keeps the chart and the setup column side by side from 80rem. Today keeps its tiles. The forward test keeps its scorecards.
-- Phone (390): one column, the same bottom nav, 44px targets on coarse pointers.
-- Landing (`/welcome`): a white 64px bar (lowercase wordmark, 14px links, a ghost button and a black button). The hero is two columns on `#edeff2`: the headline, the description, and the two actions on the left; a white chart card on the right, with the only large shadow in the product. Under that, the exchange names in one weight and one gray, with no logos. A `#1a1a1a` band holds two alternating columns (sentence, then a white line drawing). A light band holds the feature cards. A dark band closes with the honest note and a white button. The footer is the same dark ground.
+The terminal stays the same pages. The shell is capped at 1440px so a wide monitor does not stretch the tables edge to edge. Cards are a raised surface on a black canvas, 16px padding, 12px corners. Controls inside them are 8px corners. Phone padding is 16px. The bottom nav floats 12px off the screen edge. The "More" list opens as a full-height panel. Targets on a coarse pointer are at least 40px, and the main ones 48px.
+
+The landing keeps its sections and its sentences. The nav is a compact bar, centered, off the top edge. The hero is still two columns (words, then the existing chart image). The feature list is no longer three equal columns: the first item spans the row, and the rest sit in two unequal columns. On a phone it is one column.
 
 ## Type
 
-Inter is the only face in the terminal, including prices, which stay tabular so columns of figures do not shift. Body is 16px, weight 400, line-height 1.5. UI labels are 14px, weight 500. Headings are weight 700 with default tracking. The landing headline is the only other face: Space Grotesk, 56px, weight 700, line-height 1.2. On a phone that headline is 32px.
+Geist is the only face. Geist Mono is used for prices, R, and table figures, with tabular numbers so columns do not shift. Sizes sit on the standard scale: 12/16, 14/20, 16/24, 20/28, 24/32, 30/36, 36/40, and 48/1 for the landing headline. Weights are 400, 500, and 600, with 700 only on that headline. No italics. Headings use `text-wrap: balance`. Body copy uses `text-wrap: pretty`.
 
 ## Color
 
-| Role | Token |
+Flat surfaces from the approved dark scale. No background gradient. The landing headline is the one gradient, on the text only, white to `#9b9b9b`.
+
+| Role | Value |
 | --- | --- |
-| Canvas | `#edeff2` cloud |
-| Card, input, nav | `#ffffff` |
-| Inset | `#f7f8fa` paper |
-| Text and filled button | `#000000` |
-| Dark band and footer | `#1a1a1a` |
-| Nav links | `#333333` graphite |
-| Body on light | `#5a5a5a` iron |
-| Muted | `#666666` slate, `#808080` steel |
-| Body on dark | `#a0a0a0` fog |
-| Hairline | `#dedfe1` mist |
-| Wash, the only accent | `#e2e7fc` |
-| Chart, entry, and OI lines | `#4a6cf7` |
-| Up candle and positive P&L | `#2f6b45` |
-| Down candle and negative P&L | `#9a3d3d` |
+| Canvas | `#000000` |
+| Nav, raised band | `#181818` |
+| Card | `#1f1f1f` |
+| Field, inset | `#272727` |
+| Hairline, hover | `#313131` |
+| Text | `#ffffff` |
+| Secondary text | `#9b9b9b` |
+| Filled button | white fill, black label |
+| Chart and entry lines | `#ffffff` |
+| Up and positive P&L | `#8faf9a` |
+| Down and negative P&L | `#c49292` |
 
-Up and down candles, and positive and negative P&L, stay green and red so a long and a short still read at a glance. Those two hues are the exception. They are muted so they sit on the light canvas. They are not used for Strong, OK, or Weak. Strength stays the word.
+Green and red are dim on purpose. They mark direction and P&L only. They are not the accent, and they are not used for Strong, OK, or Weak. A selected zone, book, or chip is a lighter gray with a full white ring. A thin grain sits over the page so the black is not a flat void. Shadows are not used. Depth comes from the surface step.
 
-`#e2e7fc` is the only UI wash: a selected zone, a selected book, a selected chip. `#4a6cf7` is only a line on a chart (entry, structure marks, open interest, backtest equity). A wash that pale would disappear on white, and the spec already names `#4a6cf7` as the chart line. Buttons stay black.
+`:root` and `.dark` share one token block, so a stored light preference cannot paint a second theme. The inline script in `index.html` and `welcome.html` is unchanged.
 
-No gradients and no glows. The only drop shadows are the black button (`0 2px 4px rgba(0,0,0,.04)`) and the hero chart card (that shadow, plus `0 8px 32px rgba(0,0,0,.08)`). Everything else is a 1px hairline.
+## Motion
+
+Movement uses `cubic-bezier(0.22, 1, 0.36, 1)`, 500ms for a move and 300ms for a color change. Buttons press to 98% scale. Landing sections rise 32px and fade in once, through `IntersectionObserver`. The honest note lights word by word as each word crosses a line on the page. `prefers-reduced-motion` drops the movement and keeps a color change.
 
 ## What did not change
 
-Feature behavior, the confidence sentence, chart line names (Entry top, Stop, TP1, TP2), forward-test scorecards, and the device-only alert store. `/` is still the terminal. Hash tabs and the PWA `start_url` stay `/`. The particle sphere and the aurora gradient are gone.
+Feature behavior, the words on the pages, chart line names, forward-test scorecards, filters, the Filled and Not filled table, Export CSV, and the device-only stores. `/` is still the terminal. Hash tabs and the PWA start URL stay `/`. No new page, setting, or calculation.

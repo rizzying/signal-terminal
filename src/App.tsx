@@ -42,7 +42,7 @@ export default function App() {
   } catch { /* storage blocked: run with defaults */ } finally { setReady(true); } })(); }, []);
   const setSettings = (s: Settings) => { setSettingsS(s); db.set("settings", s); };
   const pickStrategy = (s: Strategy) => { setSettings(s.settings); setStratId(s.id); setActiveId(s.id); };
-  useEffect(() => { document.documentElement.classList.add("dark"); document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#edeff2"); }, []);
+  useEffect(() => { document.documentElement.classList.add("dark"); document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#000000"); }, []);
   useEffect(() => { const f = () => { const h = location.hash.slice(1) as Tab; if (ALL_TABS.some((t) => t.id === h)) setTab(h); }; addEventListener("hashchange", f); return () => removeEventListener("hashchange", f); }, []);
   useEffect(() => { history.replaceState(null, "", `#${tab}`); window.scrollTo(0, 0); }, [tab]);
   const journal = (d: Draft) => {
@@ -53,6 +53,7 @@ export default function App() {
   };
   return (
     <div className="app">
+      <a className="skip" href="#content" onClick={(e) => { e.preventDefault(); document.getElementById("content")?.focus(); }}>Skip to content</a>
       <header className="top">
         <a className="brand" href="#scan" onClick={() => setTab("scan")}><span className="dot" aria-hidden />Signal</a>
         <nav className="nav" aria-label="Main">{TABS.map((t) => <button key={t.id} className={`${tab === t.id ? "on" : ""} ${t.more ? "is-more" : ""}`} aria-current={tab === t.id ? "page" : undefined} onClick={() => { setTab(t.id); setMore(false); }}>{t.id === "watch" ? <>Watch<span className="lg">list</span></> : t.name}{t.labs && <span className="labs-badge">Labs</span>}</button>)}
@@ -60,9 +61,9 @@ export default function App() {
           {more && <div className="more-menu" role="menu">{TABS.filter((t) => t.more).map((t) => <button key={t.id} role="menuitem" className={tab === t.id ? "on" : ""} onClick={() => { setTab(t.id); setMore(false); }}>{t.name}{t.labs && <span className="labs-badge">Labs</span>}</button>)}</div>}
         </nav>
       </header>
-      <main className={`pg-${tab}`}>
-        {!ready ? <p className="dim small center" role="status">Loading…</p> : <>
-        <Suspense fallback={<p className="dim small center" role="status">Loading…</p>}>
+      <main id="content" tabIndex={-1} className={`pg-${tab}`}>
+        {!ready ? <p className="skel center" role="status">Loading…</p> : <>
+        <Suspense fallback={<p className="skel center" role="status">Loading…</p>}>
         {tab === "forward" && (labs.forward ? <ForwardView /> : <section className="card stack" data-labs-off><h2>Forward test</h2><p className="dim">This is a Labs feature. Turn on "Forward test" under Labs in Settings to see it.</p></section>)}
         {tab === "today" && <TodayView settings={settings} go={setTab} onScan={(ex, sym, tf, dir) => { localStorage.setItem("sig.ex", ex); localStorage.setItem("sig.sym", sym); localStorage.setItem("sig.tf", tf); sessionStorage.setItem("sig.autoscan", dir); setTab("scan"); }} />}
         {tab === "scan" && <ScanView stratId={stratId} onPickStrategy={pickStrategy} settings={settings} theme="dark" onJournal={journal} />}

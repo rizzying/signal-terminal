@@ -30,7 +30,7 @@ export function CalendarView() {
     <section className="stack">
       <div className="card">
         <div className="cardhead"><h2>Economic calendar</h2><span className="lbl">{month} · US · high impact · times in WIB</span></div>
-        {!cal && !err && <p className="dim">Loading…</p>}
+        {!cal && !err && <p className="skel" role="status">Loading…</p>}
         {err && <p className="note warn" role="alert">{err}</p>}
         {cal && <p className="dim small">{cal.coverage} {cal.notes.join(" ")}</p>}
         {cal && cal.events.some((e) => e.actual) && <p className="dim small">Actuals are computed from the official seasonally adjusted series on FRED; they can differ by a rounding step from the headline print.</p>}

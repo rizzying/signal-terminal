@@ -30,7 +30,7 @@ export function Wallets() {
         return <div className="card" key={w.address}>
           <div className="cardhead"><h2>{w.name} <span className="dim small mono">{w.ex === "hyperliquid" ? "Hyperliquid" : "Bulk"} · {short(w.address)}</span></h2>
             <span className="row gap">{typeof s === "object" && s.equity != null && <span className="mono">Equity ${fmt(s.equity)}</span>}<button className="btn ghost sm" onClick={() => save(ws.filter((x) => x.address !== w.address))}>Remove</button></span></div>
-          {s == null ? <p className="dim">Loading…</p> : typeof s === "string" ? <p className="alert">Couldn't load: {s}</p> : s.positions.length === 0 ? <p className="dim">No open positions.</p> :
+          {s == null ? <p className="skel" role="status">Loading…</p> : typeof s === "string" ? <p className="alert">Couldn't load: {s}</p> : s.positions.length === 0 ? <p className="dim">No open positions.</p> :
             <table className="rt"><thead><tr><th>Symbol</th><th>Side</th><th>Size</th><th>Entry</th><th>Value</th><th>Unrealized P&L</th><th>Lev.</th><th>Liq. price</th></tr></thead><tbody>
               {s.positions.map((p) => <tr key={p.symbol}><td data-label="Symbol"><b>{p.symbol}</b></td><td data-label="Side"><span className={`badge ${p.side}`}>{p.side}</span></td><td data-label="Size" className="num">{fmt(p.size)}</td><td data-label="Entry" className="num">{fmt(p.entry)}</td>
                 <td data-label="Value" className="num">${fmt(p.notional)}</td><td data-label="Unrealized P&L" className={`num ${p.upnl >= 0 ? "pos" : "neg"}`}>{p.upnl >= 0 ? "+" : "−"}${fmt(Math.abs(p.upnl))}</td><td data-label="Lev." className="num">{p.lev ? `${p.lev}x` : "–"}</td><td data-label="Liq. price" className="num">{p.liq ? fmt(p.liq) : "–"}</td></tr>)}
