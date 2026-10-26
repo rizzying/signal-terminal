@@ -42,7 +42,7 @@ export default function App() {
   } catch { /* storage blocked: run with defaults */ } finally { setReady(true); } })(); }, []);
   const setSettings = (s: Settings) => { setSettingsS(s); db.set("settings", s); };
   const pickStrategy = (s: Strategy) => { setSettings(s.settings); setStratId(s.id); setActiveId(s.id); };
-  useEffect(() => { document.documentElement.classList.add("dark"); document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#000000"); }, []);
+  useEffect(() => { document.documentElement.classList.add("dark"); document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#f6f0e4"); }, []);
   useEffect(() => { const f = () => { const h = location.hash.slice(1) as Tab; if (ALL_TABS.some((t) => t.id === h)) setTab(h); }; addEventListener("hashchange", f); return () => removeEventListener("hashchange", f); }, []);
   useEffect(() => { history.replaceState(null, "", `#${tab}`); window.scrollTo(0, 0); }, [tab]);
   const journal = (d: Draft) => {

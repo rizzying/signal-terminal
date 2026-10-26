@@ -14,7 +14,7 @@ const HONEST = "Signal is a free beta. We're testing how the setups perform righ
 function LineArt() {
   return (
     <svg className="land-art" viewBox="0 0 480 220" aria-hidden="true">
-      <polyline fill="none" stroke="#fff" strokeWidth="1.5" points="8,168 56,150 104,176 152,118 200,136 248,84 296,108 344,52 392,78 472,36" />
+      <polyline fill="none" stroke="currentColor" strokeWidth="1.5" points="8,168 56,150 104,176 152,118 200,136 248,84 296,108 344,52 392,78 472,36" />
     </svg>
   );
 }
@@ -27,7 +27,7 @@ function Tagline({ text }: { text: string }) {
 export function Welcome() {
   useEffect(() => {
     document.documentElement.classList.add("land-root", "dark");
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#000000");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#f6f0e4");
     const reduce = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const sections = [...document.querySelectorAll<HTMLElement>(".reveal")];
     const words = [...document.querySelectorAll<HTMLElement>(".land-tagline .w")];
