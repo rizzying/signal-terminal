@@ -2,23 +2,25 @@
 
 Visual only. Pages, copy, controls, and every number stay as they are. The confidence line stays: "Low, Med or High is a weighted score of how strongly the signals agree. It is not a win chance." The forward test, its recording job, and the calculations are untouched.
 
-This replaces the Glassnode light system (cloud canvas, white cards, Inter, blue wash). It does not bring back the earlier dark teal terminal.
+This replaces the flat black terminal from the previous pass. The owner said that mood felt sad. The new mood is warm daylight: a paper canvas, white work surfaces, one coral accent, and green and red that read at a glance. It is still a trading terminal. It does not return to the Glassnode cool gray, and it does not return to a black screen with a neon mark.
 
 ## References
 
-Looked at before the CSS change. Nothing was copied: no logos, no images, no sentences.
+Looked at before the color change. Nothing was copied: no logos, no images, no sentences.
 
-1. [SaaSFrame on Designeer](https://designeer.xyz/inspiration/saasframe) ([saasframe.io](https://www.saasframe.io/)). Product screens sit in a quiet frame: a short header, then metric blocks, then the working table. Used here for the order of a page. Scorecards first, the trade table after, one filled action.
-2. [Screenlane on Designeer](https://designeer.xyz/inspiration/screenlane) ([screenlane.com](https://screenlane.com/)). App screens keep a persistent nav and let the table be the work surface. Used here for the terminal: the same tabs, a content width that stops stretching on a very wide monitor, phone nav parked at the bottom.
-3. [Dark Mode Design on Designeer](https://designeer.xyz/inspiration/dark-mode-design) ([darkmodedesign.com](https://www.darkmodedesign.com/)) and [Sombra](https://designeer.xyz/inspiration/sombra) ([sombra.design](https://sombra.design/)). Dark interfaces built from stepped neutrals, not a neon accent on pure black. [Details](https://designeer.xyz/inspiration/details) ([details.so](https://www.details.so/)) for the small motions: press, focus, and a menu that arrives instead of popping.
+1. [Saaspo on Designeer](https://designeer.xyz/inspiration/saaspo) ([saaspo.com](https://saaspo.com/)). SaaS pages there are bright product screens: a light field, a clear primary action, and numbers that sit on white. Used here for the page temperature. The terminal opens on paper, the cards are white, and the filled action is the one warm accent.
+2. [Land-book on Designeer](https://designeer.xyz/inspiration/land-book) ([land-book.com](https://land-book.com/)). The gallery's own pages, and the landing work it files, use a light ground with a single saturated action instead of a dark frame. Used here for the landing: warm paper, a coral "Open Signal", and section bands that step from paper to white to a flat peach tint. No background gradient.
+3. [Details on Designeer](https://designeer.xyz/inspiration/details) ([details.so](https://www.details.so/)). Small motions stay: press to 98%, a focus ring, and a menu that arrives. The accent is reserved for the current tab, the filled button, and the selected chip, so the rest of the terminal can stay quiet and readable.
 
-Refactoring UI, applied inside the skill limits: hierarchy from size and weight, space before rules, one gray family, green and red only where a long and a short have to be told apart.
+Refactoring UI, inside the skill limits: hierarchy from size and weight, one warm gray family, space before extra rules, and color only where it carries meaning. Green and red are for direction and P&L. The accent is for selection and the primary action. Strong, OK, and Weak stay in the ink scale.
+
+The redesign skill's type, spacing, radius, and motion values are unchanged. Its default dark surface list is the thing that made the last pass feel heavy, so this pass adapts the color values only. The skill allows that adaptation in its Design Values section. Backgrounds stay flat. The landing headline is the only gradient, and it is on the text.
 
 ## Layout
 
-The terminal stays the same pages. The shell is capped at 1440px so a wide monitor does not stretch the tables edge to edge. Cards are a raised surface on a black canvas, 16px padding, 12px corners. Controls inside them are 8px corners. Phone padding is 16px. The bottom nav floats 12px off the screen edge. The "More" list opens as a full-height panel. Targets on a coarse pointer are at least 40px, and the main ones 48px.
+The terminal stays the same pages. The shell is still capped at 1440px. Cards are white on warm paper, 16px padding, 12px corners. Controls inside them are 8px corners. Phone padding is 16px. The bottom nav floats 12px off the screen edge on a warm translucent bar. The "More" list opens as a full-height paper panel. Targets on a coarse pointer are at least 40px, and the main ones 48px.
 
-The landing keeps its sections and its sentences. The nav is a compact bar, centered, off the top edge. The hero is still two columns (words, then the existing chart image). The feature list is no longer three equal columns: the first item spans the row, and the rest sit in two unequal columns. On a phone it is one column.
+The landing keeps its sections and its sentences. The nav is a compact bar, centered, off the top edge. The hero is still two columns. The feature list is still the first item across the row, then two unequal columns. On a phone it is one column. The feature band is a flat peach field so that section feels warmer than the paper around it.
 
 ## Type
 
@@ -26,23 +28,25 @@ Geist is the only face. Geist Mono is used for prices, R, and table figures, wit
 
 ## Color
 
-Flat surfaces from the approved dark scale. No background gradient. The landing headline is the one gradient, on the text only, white to `#9b9b9b`.
+Flat surfaces. No background gradient. The landing headline fades from `#1c1712` to `#7a7064`, left to right, on the text only. That fade stays in the warm ink family. A cool gray fade on this paper would mix two gray families.
 
 | Role | Value |
 | --- | --- |
-| Canvas | `#000000` |
-| Nav, raised band | `#181818` |
-| Card | `#1f1f1f` |
-| Field, inset | `#272727` |
-| Hairline, hover | `#313131` |
-| Text | `#ffffff` |
-| Secondary text | `#9b9b9b` |
-| Filled button | white fill, black label |
-| Chart and entry lines | `#ffffff` |
-| Up and positive P&L | `#8faf9a` |
-| Down and negative P&L | `#c49292` |
+| Canvas | `#f6f0e4` |
+| Nav, raised band | `#fffaf4` |
+| Card | `#ffffff` |
+| Field, inset | `#f3eadc` |
+| Hairline, hover | `#e6dccb`, hover `#efe4d2` |
+| Text | `#1c1712` |
+| Secondary text | `#5f564c` |
+| Accent | `#e15a1c` |
+| Text on the accent | `#1c1712` |
+| Selected tint | `#fff1e6` |
+| Chart and entry lines | `#1c1712` |
+| Up and positive P&L | `#0c8f58` |
+| Down and negative P&L | `#e11d3a` |
 
-Green and red are dim on purpose. They mark direction and P&L only. They are not the accent, and they are not used for Strong, OK, or Weak. A selected zone, book, or chip is a lighter gray with a full white ring. A thin grain sits over the page so the black is not a flat void. Shadows are not used. Depth comes from the surface step.
+The accent is a coral, saturated enough to feel awake and still under a shout. Dark ink sits on it so a 16px label stays readable. Green and red are vivid so a profit and a loss separate immediately. They are not the accent. A selected zone, book, or filter is the peach tint with a coral ring. The current tab, the filled button, and an on chip use the solid coral. A thin grain sits over the page so the paper is not a flat void. Card depth is the step from paper to white, plus a hairline all the way around. Floating menus use one warm shadow.
 
 `:root` and `.dark` share one token block, so a stored light preference cannot paint a second theme. The inline script in `index.html` and `welcome.html` is unchanged.
 

@@ -40,8 +40,8 @@ describe("welcome route", () => {
     expect(app).not.toContain("Switch to");
     expect(JSON.parse(read("package.json")).version).toBe("3.6.0");
     const css = read("src/styles.css");
-    expect(css).toMatch(/:root,\.dark\{[^}]*--bg:#000000/);
-    expect(css.match(/--bg:#000000/g)).toHaveLength(1);
+    expect(css).toMatch(/:root,\.dark\{[^}]*--bg:#f6f0e4/);
+    expect(css.match(/--bg:#f6f0e4/g)).toHaveLength(1);
     expect(css).not.toContain("#edeff2");
     expect(css).not.toContain("#e2e7fc");
     expect(css).not.toContain("#4a6cf7");
